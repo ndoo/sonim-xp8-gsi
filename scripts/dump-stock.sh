@@ -58,10 +58,15 @@ if [ $NOADB = 0 ]; then
         [ $OTHERBUILD = 1 ] || die "stock build '$bid' is not the tested build '$SUPPORTED_BUILD_ID'; see README.md#supported-devices before using --allow-other-build"
         warn "untested stock build: $bid ($fp)"
     fi
-    sim=$(A shell getprop gsm.sim.state | tr -d '\r')
-    if A shell dumpsys connectivity 2>/dev/null | grep -qE 'Transports: CELLULAR.*VALIDATED'; then data=1; else data=0; fi
+    say "checking the SIM and mobile data (up to 60 s)"
+    for ((i = 0; i < 12; i++)); do
+        sim=$(A shell getprop gsm.sim.state 2>/dev/null | tr -d '\r' || true)
+        if A shell dumpsys connectivity 2>/dev/null | grep -qE 'Transports: CELLULAR.*VALIDATED'; then data=1; else data=0; fi
+        [[ $sim != *LOADED* || $data = 0 ]] || break
+        [ $i = 11 ] || sleep 5
+    done
     if [[ $sim != *LOADED* || $data = 0 ]]; then
-        msg="on stock Android 10 the SIM state is '$sim' and mobile data is $([ $data = 1 ] && echo validated || echo 'not validated')"
+        msg="on stock Android 10 the SIM state is '$sim' and mobile data is $([ "$data" = 1 ] && echo validated || echo 'not validated')"
         [ $SKIPSIM = 1 ] || die "$msg. The GSI does not fix a SIM or network that fails on stock. Fix it on stock first (turn Wi-Fi off to test data), or pass --skip-sim-check"
         warn "$msg"
     fi
