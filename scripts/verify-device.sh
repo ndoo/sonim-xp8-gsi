@@ -75,7 +75,12 @@ check "/sdcard mounted" "emulated;0" sdcard_ok
 sim=$(prop gsm.sim.state)
 check "SIM loaded" "gsm.sim.state=$sim" grep -q LOADED <<< "$sim"
 
-svc=$(A shell dumpsys telephony.registry 2>/dev/null | grep -m1 -oE 'mDataRegState=[0-9]+\([A-Z_]+\)' || true)
+# Only the "last known state" block: the log sections after it hold old states.
+svc=$(sh_ dumpsys telephony.registry | awk '
+    /^local logs:/ {exit}
+    /Phone Id=/ {sub(/.*Phone Id=/, ""); id = $1}
+    /mServiceState=/ && match($0, /mDataRegState=[0-9]+\([A-Z_]+\)/) {
+        printf "%sslot %s: %s", sep, id, substr($0, RSTART, RLENGTH); sep = ", "}' || true)
 check "network registration" "${svc:-no service state}" grep -q IN_SERVICE <<< "$svc"
 
 cell=$(A shell dumpsys connectivity 2>/dev/null | grep -E 'Transports: CELLULAR' || true)
