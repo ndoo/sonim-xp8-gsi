@@ -344,8 +344,9 @@ enforcing mode ([technical.md](technical.md#init-script-and-boot-time-fixes)).
    It checks boot, file-based encryption, the PIN unlock (it asks you to
    unlock), `/sdcard`, SIM, network registration, mobile data, a ping, the
    IMS service, the media codecs, the vibrator, the XTRA daemon, the WebView
-   provider and the hidden AOSP setup wizard (14 checks), prints a
-   PASS/FAIL table, and ends with `all automatic checks passed`.
+   provider, the hidden AOSP setup wizard and the removed AOSP search app
+   (15 checks), prints a PASS/FAIL table, and ends with `all automatic
+   checks passed`.
 4. Do the hand checks it lists: a VoLTE call each way with the HD icon, an
    SMS each way, vibration, fingerprint, speaker, Maps location.
 

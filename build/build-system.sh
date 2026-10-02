@@ -2,8 +2,9 @@
 # SPDX-FileCopyrightText: 2026 Andrew Yong
 # SPDX-License-Identifier: MIT
 #
-# Build out/system.img: TrebleDroid vanilla-old + MindTheGapps + tethering apex
-# fix + ImsCafXp8 + Launcher3 and AuthService patches. Also writes
+# Build out/system.img: TrebleDroid vanilla-old + MindTheGapps (replacing AOSP
+# QuickSearchBox) + tethering apex fix + ImsCafXp8 + Launcher3 and AuthService
+# patches. Also writes
 # out/components/messaging/ (patched Messaging APK + its oat, for the vendor image).
 #
 # usage: build/build-system.sh [STAGE...]
@@ -134,7 +135,7 @@ stage_base() {
 }
 
 stage_gapps() {
-    log "gapps: MindTheGapps into /system/{product,system_ext}"
+    log "gapps: MindTheGapps into /system/{product,system_ext}; AOSP QuickSearchBox removed"
     local f rel
     q_begin
     while IFS= read -r f; do
@@ -144,6 +145,7 @@ stage_gapps() {
             *) q_put "$f" "/system/$rel" "$SYS" ;;
         esac
     done < <(find "$CACHE/mtg" -type f | LC_ALL=C sort)
+    q_rm_tree /system/product/app/QuickSearchBox
     q_commit
 }
 

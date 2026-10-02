@@ -113,6 +113,8 @@ check "WebView provider set" "${wvline:-no output}" wv_ok
 
 prov=$(sh_ pm path com.android.provision || true)
 check "AOSP Provision hidden" "pm path com.android.provision ${prov:-empty}" test -z "$prov"
+qsb=$(sh_ pm path com.android.quicksearchbox || true)
+check "AOSP QuickSearchBox removed" "pm path com.android.quicksearchbox ${qsb:-empty}" test -z "$qsb"
 
 echo
 echo "Automatic checks on $SERIAL"

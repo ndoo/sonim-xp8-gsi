@@ -164,6 +164,7 @@ Android 10 vendor policy needs.
 | Change | Why | Source |
 |---|---|---|
 | MindTheGapps 16 | Google apps and Play services | [`build/inputs.lock`](../build/inputs.lock) |
+| AOSP QuickSearchBox (`/system/product/app/QuickSearchBox`) removed | The Google app from MindTheGapps provides search. With both installed, QuickSearchBox comes first as the global search activity, whose widget Launcher3's search bar shows | [`build/build-system.sh`](../build/build-system.sh) |
 | Tethering APEX: null checks for `sLocalNetBlockedUidMap` in `BpfNetMaps`; the APEX is rebuilt, re-signed with AOSP's tethering test key (the key TrebleDroid's APEX already carries, or `APEX_KEY`) and stored uncompressed | Without eBPF the map is null and the connectivity service dereferences it | [`system/apexfix/`](../system/apexfix/) |
 | phh's IMS app `ims-caf-u` as `ImsCafXp8`, platform-signed | VoLTE. The Sonim IMS HAL numbers `IImsRadioIndication` transactions one higher than the interface the app implements from code `0x17` on; the patch drops code `0x17` and shifts the higher codes down by one | [`system/ims/`](../system/ims/) |
 | Launcher3 `isTaskbarEnabled` | With taskbar/navigation bar unification, Launcher3 enables its Taskbar even when the navigation bar is off for the hardware keys; the patch enables it only when the window manager has a navigation bar | [`system/launcher3/`](../system/launcher3/) |
