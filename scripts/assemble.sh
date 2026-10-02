@@ -11,12 +11,13 @@
 #   --out DIR          where boot.img and vendor.img go (default: out)
 #   --work DIR         scratch space, about 6 GiB (default: work/assemble)
 #   --magisk           root: patch boot.img with Magisk. Off unless you ask for it.
-#   --docker           run inside the build/Dockerfile image (needed on macOS)
+#   --docker           run inside the build/Dockerfile image (needed on macOS and
+#                      Windows; on Windows --work is the Docker volume xp8-gsi-work)
 #   --keep-work        keep the unpacked system_a and vendor tree
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-usage() { sed -n '8,16s/^# \{0,1\}//p' "$0" >&2; exit 2; }
+usage() { sed -n '8,17s/^# \{0,1\}//p' "$0" >&2; exit 2; }
 die() { echo "assemble: $*" >&2; exit 1; }
 abs() { mkdir -p "$1" && (cd "$1" && pwd); }
 
@@ -50,6 +51,15 @@ if [ $DOCKER = 1 ]; then
     args=(--components /components --out /out --work /work)
     [ $MAGISK = 1 ] && args+=(--magisk)
     [ $KEEP = 1 ] && args+=(--keep-work)
+    case $(uname -s) in
+        MINGW*|MSYS*|CYGWIN*)
+            # A Windows folder cannot hold the vendor tree's symlinks and modes.
+            exec env MSYS_NO_PATHCONV=1 docker run --rm --platform linux/amd64 -e HOME=/tmp \
+                -v "$(cygpath -w "$ROOT"):/src" -v "$(cygpath -w "$STOCK"):/stock:ro" \
+                -v "$(cygpath -w "$COMPONENTS"):/components:ro" -v "$(cygpath -w "$OUTDIR"):/out" \
+                -v xp8-gsi-work:/work -w /src \
+                "$img" scripts/assemble.sh "${args[@]}" /stock ;;
+    esac
     exec docker run --rm --platform linux/amd64 -u "$(id -u):$(id -g)" -e HOME=/tmp \
         -v "$ROOT:/src" -v "$STOCK:/stock:ro" -v "$COMPONENTS:/components:ro" \
         -v "$OUTDIR:/out" -v "$WORKDIR:/work" -w /src \
