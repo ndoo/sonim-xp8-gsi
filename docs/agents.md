@@ -61,8 +61,8 @@ Pass: `d25b298ca36f467c3e30293e25492f08ea4831b4e98140313ff9ebca065c59b2` and
 Fail: stop and tell the user which file to download (see
 [Prerequisites](install.md#prerequisites)).
 Then: `git describe --tags --exact-match`.
-Pass: prints a release tag (`a16-YYYYMMDD`); set `TAG` to it. The scripts
-must match the release you install.
+Pass: prints a release tag (`a16-YYYYMMDD` or `a16-YYYYMMDD.N`); set `TAG`
+to it. The scripts must match the release you install.
 Fail: **STOP**; show the user the latest tag
 (`gh release list -R ndoo/sonim-xp8-gsi -L 1`) and ask before running
 `git checkout <tag>`.

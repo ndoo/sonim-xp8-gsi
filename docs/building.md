@@ -138,6 +138,8 @@ git checkout of the same tag.
 - [.github/workflows/release.yml](../.github/workflows/release.yml), on a
   pushed `a16-*` tag: fetches the inputs, builds the components and the
   system image, packages them, and publishes a GitHub release with the three
-  assets. Run by hand (`workflow_dispatch`), it builds the same and uploads
-  `out/release/` as a workflow artifact named `release-dryrun-<date>`
-  instead of publishing.
+  assets. Tags are `a16-YYYYMMDD`; a later release on the same day is
+  `a16-YYYYMMDD.N` (N from 1), titled "(update N)". Any other `a16-*` tag
+  fails before the build. Run by hand (`workflow_dispatch`), it builds the
+  same and uploads `out/release/` as a workflow artifact named
+  `release-dryrun-<date>` instead of publishing.
