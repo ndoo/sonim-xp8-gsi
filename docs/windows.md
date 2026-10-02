@@ -4,7 +4,8 @@ Route A (install from the release) runs on Windows 10 and 11. Follow
 [install.md](install.md) with the tools, edl setup and EDL driver below. Route B
 (build from source) is not supported on Windows: build on Linux.
 
-Windows support starts after release `a16-20261002`. Check out a later tag.
+Windows support starts with release `a16-20261002.1`: check out that tag or a
+later one.
 
 ## Tools
 
@@ -21,8 +22,10 @@ Where [install.md](install.md) uses `shasum -a 256`, use `sha256sum`.
 
 ## edl
 
-Set up edl in place of the commands under
-[Set up the working directory](install.md#set-up-the-working-directory):
+Follow [Set up the working directory](install.md#set-up-the-working-directory),
+but replace its edl lines (from `git clone https://github.com/bkerler/edl.git`
+to `install-linux-edl-drivers.sh`) with these. Keep the other steps: the clone
+and tag checkout, the firehose loader and the userdebug ABL.
 
 ```sh
 git clone https://github.com/bkerler/edl.git work/edl
