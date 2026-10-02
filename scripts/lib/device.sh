@@ -37,6 +37,11 @@ sha256_stdin() {
 
 fsize() { wc -c < "$1" | tr -d ' '; }
 
+is_windows() { case $(uname -s) in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac; }
+
+# On Windows python3 can be the Microsoft Store stub, which runs nothing.
+py3() { if python3 -c '' 2>/dev/null; then python3 "$@"; else python "$@"; fi; }
+
 # Ask the user to type WORD. --yes (YES=1) means the user already approved this step.
 confirm() {
     local word=$1 msg=$2 ans
@@ -64,10 +69,11 @@ check_single() {
     [ "$n" = 0 ] || die "$n other adb/fastboot device(s) attached; disconnect every phone except $SERIAL"
 }
 
-adb_state() { adb -s "$SERIAL" get-state 2>/dev/null || true; }
+adb_state() { adb -s "$SERIAL" get-state 2>/dev/null | tr -d '\r' || true; }
 in_adb() { [ "$(adb_state)" = device ]; }
 in_fastboot() { fastboot devices 2>/dev/null | awk '{print $1}' | grep -qxF -- "$SERIAL"; }
-A() { adb -s "$SERIAL" "$@"; }
+# Git Bash would rewrite phone paths such as /sdcard into Windows paths.
+A() { MSYS_NO_PATHCONV=1 adb -s "$SERIAL" "$@"; }
 F() { fastboot -s "$SERIAL" "$@"; }
 
 # getvar output goes to stderr as "name: value".
@@ -141,8 +147,18 @@ E() { "${EDL_CMD[@]}" --loader="$EDL_LOADER" --memory=emmc "$@"; }
 # edl reset rejects --memory, and prints a USBError traceback as the phone disconnects.
 E_reset() { "${EDL_CMD[@]}" --loader="$EDL_LOADER" reset >/dev/null 2>&1 || true; }
 
+# One "svc:<driver service>" line per attached 9008 device.
+win_9008_services() {
+    # shellcheck disable=SC2016  # PowerShell variables
+    MSYS_NO_PATHCONV=1 powershell.exe -NoProfile -NonInteractive -Command \
+        'Get-CimInstance Win32_PnPEntity | Where-Object { $_.DeviceID -like "USB\VID_05C6&PID_9008*" } | ForEach-Object { "svc:" + $_.Service }' |
+        tr -d '\r'
+}
+
 count_9008() {
     case $(uname -s) in
+        MINGW*|MSYS*|CYGWIN*)
+            win_9008_services | grep -c '^svc:' || true ;;
         Darwin)
             ioreg -p IOUSB -l -w0 | awk '
                 /"idProduct" = / {p = $NF}
@@ -166,8 +182,16 @@ wait_edl() {
         [ "$n" -ge 1 ] && break
         sleep 1
     done
-    [ "$n" -ge 1 ] || die "no 9008 device; enter EDL by keys (power off, hold Vol+ and Vol-, press Power). macOS: accept 'Allow accessory to connect'"
+    [ "$n" -ge 1 ] || die "no 9008 device; enter EDL by keys (power off, hold Vol+ and Vol-, press Power). macOS: accept 'Allow accessory to connect'. Windows: see docs/windows.md#edl-driver"
     [ "$n" = 1 ] || die "$n Qualcomm 9008 devices attached; disconnect all but one"
+    if is_windows; then
+        local svc
+        svc=$(win_9008_services | sed 's/^svc://')
+        case $svc in
+            WinUSB|libusbK|libusb0) ;;
+            *) die "the 9008 device uses the driver '${svc:-none}'; edl needs WinUSB. Install it with Zadig: docs/windows.md#edl-driver" ;;
+        esac
+    fi
     sleep 2
 }
 
@@ -184,7 +208,7 @@ edl_identify() {
     fi
     serial=$(sed -nE 's/.*(Chip Serial Number|Serial|Device serial) *: *(0x)?([0-9a-fA-F]+).*/\3/p' "$log" |
              head -n 1 | tr 'A-F' 'a-f')
-    sed -E 's/([Ss]erial[^:]*: *)(0x)?[0-9a-fA-F]+/\1<hidden>/' "$log" > "$gpt"
+    tr -d '\r' < "$log" | sed -E 's/([Ss]erial[^:]*: *)(0x)?[0-9a-fA-F]+/\1<hidden>/' > "$gpt"
     rm -f "$log"
     if [ -z "$serial" ]; then
         die "edl skipped the Sahara handshake (loader already running), so the unit cannot be identified; hold Power about 10 s, enter EDL again by keys and rerun"
@@ -253,7 +277,7 @@ backup_image() {
 
 # misc image holding a bootloader message that starts recovery with --wipe_data.
 make_wipe_bcb() {
-    python3 - "$1" <<'PY'
+    py3 - "$1" <<'PY'
 import sys
 m = bytearray(1048576)
 m[0:13] = b"boot-recovery"

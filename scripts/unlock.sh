@@ -84,7 +84,7 @@ fi
 
 # Android's PersistentDataBlockService reformats frp, clearing the byte, when
 # its checksum (SHA-256 of 32 zero bytes + bytes 32..end) does not match.
-python3 - "$OUTDIR/frp-before.bin" "$WORK/frp-unlock.bin" <<'PY'
+py3 - "$OUTDIR/frp-before.bin" "$WORK/frp-unlock.bin" <<'PY'
 import hashlib, sys
 d = bytearray(open(sys.argv[1], "rb").read())
 d[-1] = 1
