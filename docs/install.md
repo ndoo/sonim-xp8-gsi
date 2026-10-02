@@ -47,8 +47,8 @@ Only slot `_a` is changed. Slot `_b` stays stock and is not a fallback.
 
 ## Prerequisites
 
-Host: macOS (Apple silicon or Intel) or Linux. No Windows or Qualcomm
-drivers are needed.
+Host: macOS (Apple silicon or Intel) or Linux, with no Qualcomm drivers.
+Route A also runs on Windows in Git Bash: see [windows.md](windows.md).
 
 ### Tools
 

@@ -52,7 +52,9 @@ several times.
 **R1. Host check.**
 Run: `adb version; fastboot --version; zstd --version; xz --version; python3 --version; docker info` and
 `"$EDL" --help | head -1`.
-Pass: every command prints a version. Docker is required on macOS.
+Pass: every command prints a version. Docker is required on macOS and Windows.
+On Windows, run everything in Git Bash, follow [windows.md](windows.md), and
+use `python` for `python3` and `sha256sum` for `shasum -a 256`.
 Then: `shasum -a 256 "$EDL_LOADER" work/userdebug/abl.elf`.
 Pass: `d25b298ca36f467c3e30293e25492f08ea4831b4e98140313ff9ebca065c59b2` and
 `7e6145d80b9fb46b7a9fdc326bd00d9593c21e3bd7929490abeb967bd9272648`.

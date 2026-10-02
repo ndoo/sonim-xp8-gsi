@@ -32,6 +32,7 @@ Report problems as an issue at
 | `fastboot` prints `could not clear input/output pipe`, `unknown command`, or hangs after a flash | See [Fastboot stall](#fastboot-stall) |
 | The hotspot does not start after updating from an earlier install | A hotspot saved with WPA3 security cannot start: the stock hostapd HAL (1.1) has no WPA3 (SAE). Open Settings > Network & internet > Hotspot & tethering > Wi-Fi hotspot > Security and choose WPA2-Personal |
 | `fastboot format:ext4 userdata` was used and `/data` does not mount | Use `fastboot erase userdata` (`scripts/flash.sh --wipe`): the host's mke2fs 1.47 sets a feature the phone's e2fsck rejects |
+| Windows: no 9008 device is found, or the script names a driver other than WinUSB | See [EDL driver](windows.md#edl-driver) in windows.md |
 | `adb devices` is empty after the install | adb is off after a wipe: enable USB debugging in Developer options and tick "Always allow" |
 | `adb devices` shows `unauthorized` | Unlock the phone and accept the prompt |
 | Apps that show web pages crash or are blank, or `verify-device.sh` fails "WebView provider set" | See [WebView](#webview) |
