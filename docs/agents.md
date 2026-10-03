@@ -29,7 +29,9 @@ the repository root.
 5. Never run `fastboot format`, `fastboot getvar all`, `fastboot
    --set-active` or `fastboot set_active` (except `fastboot set_active a`
    in the restore recovery below, after approval), `fastboot flashing
-   unlock_critical`, or anything for slot `_b`. Never interrupt a running
+   unlock_critical`, or anything for slot `_b` except through
+   `scripts/enable-ab.sh`, `scripts/flash.sh --slot`/`--switch` and
+   `scripts/ota-update.sh` after the user approved that step. Never interrupt a running
    fastboot command, and never send a fastboot command while a script is
    waiting for a write to finish. On a stall, ask the user to hold Power
    10-15 s.
@@ -133,7 +135,7 @@ Pass: the last line is `boot.img has no root` or `boot.img includes Magisk
 **R9. Flash.** **STOP**: ask for approval to erase userdata and flash.
 Precondition: the phone is in fastboot (ask the user to power off, hold Vol-
 and press Power) or in adb; `fastboot devices` lists `$SERIAL`. The script
-checks `unlocked` → `yes` and `current-slot` → `a`.
+checks `unlocked` → `yes` and reads `current-slot`.
 Run: `scripts/flash.sh --wipe`.
 Expect: `checksum OK` lines; after each flash and after the erase a
 `waiting N s for the phone to finish writing` line; `all writes done`. Let

@@ -10,7 +10,7 @@
 # usage: SERIAL=... scripts/restore-stock.sh [options] BACKUP_DIR
 #   --edl              write over EDL (needs EDL_LOADER); for a phone that cannot reach fastboot
 #   --vendor           also restore vendor_a (only if the backup has vendor_a.bin)
-#   --relock           then lock the bootloader, write back stock abl_a and clear frp
+#   --relock           then lock the bootloader, write back stock abl_a and abl_b and clear frp
 #   --restore-nv       also write modemst1, modemst2, fsg, fsc, persist (EDL, same unit only)
 #   --restore-persist  also write persist only (EDL, same unit only)
 #   --work DIR         scratch space for unpacked images, about 6 GiB (default: work/restore)
@@ -53,7 +53,7 @@ NEED_EDL=$((VIAEDL | RELOCK | NV | PERSIST))
 
 parts=(boot_a system_a)
 [ $VENDOR = 1 ] && parts+=(vendor_a)
-[ $RELOCK = 1 ] && parts+=(abl_a)
+[ $RELOCK = 1 ] && parts+=(abl_a abl_b)
 nvparts=()
 [ $NV = 1 ] && nvparts=("${NV_PARTS[@]}")
 [ $PERSIST = 1 ] && [ $NV = 0 ] && nvparts=(persist)
@@ -76,7 +76,12 @@ if [ $VIAEDL = 0 ]; then
     check_single
     to_fastboot
     [ "$(fb_var unlocked)" = yes ] || die "fastboot flash needs the unlocked bootloader; use --edl"
-    [ "$(fb_var current-slot)" = a ] || die "current slot is not a; stop"
+    if [ "$(fb_var current-slot)" != a ]; then
+        confirm switch "Slot b is active on $SERIAL. Stock Android runs from slot a; about to make slot a active (nothing is written)."
+        F set_active a
+        settle 0
+        [ "$(fb_var current-slot)" = a ] || die "current slot is still not a; stop"
+    fi
     list=(boot_a "misc (recovery --wipe_data: the next boot deletes all user data)")
     [ $VENDOR = 1 ] && list+=(vendor_a)
     list+=(system_a)
@@ -113,12 +118,14 @@ if [ $NEED_EDL = 1 ]; then
     GPT=$WORK/gpt.txt
     edl_identify "$WORK" "$GPT"
     check_unit
+    awk '$1 == "boot_a:" && /Active True/ {f = 1} END {exit !f}' "$GPT" ||
+        die "slot a is not active. Boot to fastboot and run: fastboot -s $SERIAL set_active a; then rerun"
 
     if [ $VIAEDL = 1 ]; then
         list=(boot_a)
         [ $VENDOR = 1 ] && list+=(vendor_a)
         list+=(system_a)
-        [ $RELOCK = 1 ] && list+=("abl_a (stock)" "frp (cleared)")
+        [ $RELOCK = 1 ] && list+=("abl_a, abl_b (stock)" "frp (cleared)")
         list+=("misc (recovery --wipe_data: the next boot deletes all user data)")
         confirm restore "About to write your stock backup to this phone over EDL:
 $(writes "${list[@]}")"
@@ -127,10 +134,11 @@ $(writes "${list[@]}")"
         say "writing system_a and reading it back"
         edl_write_verify system_a "$(img system_a)"
     elif [ $RELOCK = 1 ]; then
-        confirm restore "About to write the stock abl_a from your backup, a cleared frp and the recovery wipe request to misc, over EDL."
+        confirm restore "About to write the stock abl_a and abl_b from your backup, a cleared frp and the recovery wipe request to misc, over EDL."
     fi
     if [ $RELOCK = 1 ]; then
         edl_write_verify abl_a "$(img abl_a)"
+        edl_write_verify abl_b "$(img abl_b)"
         # The backup's frp carries Factory Reset Protection from backup time; Android reformats a zeroed frp.
         head -c 524288 /dev/zero > "$WORK/frp-clear.bin"
         edl_write_verify frp "$WORK/frp-clear.bin"

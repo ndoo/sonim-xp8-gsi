@@ -60,7 +60,7 @@ named partition with an image from your own backup, checked against the
 backup's `SHA256SUMS`. Never write `xbl*`, `tz*`, `rpm*`, `hyp*`, `pmic*`,
 `keymaster*`, `keystore`, `devcfg*`, `cmnlib*` or `devinfo`, and never
 another unit's `modemst1`, `modemst2`, `fsg`, `fsc` or `persist`. Slot `_b`
-is not a fallback.
+is a fallback only after `scripts/enable-ab.sh` and a full install to it.
 
 ### EDL shell function
 
@@ -177,7 +177,7 @@ E w abl_a work/restore/abl_a.bin
 ```
 
 `unlock.sh` also saved the `abl_a` and `frp` it replaced in
-`$BACKUP/unlock-<date>/`. Do not switch to slot `_b`.
+`$BACKUP/unlock-<date>/`. Do not switch to slot `_b` unless `scripts/enable-ab.sh` has prepared it.
 
 ### Unlock: get_unlock_ability stays 0
 
