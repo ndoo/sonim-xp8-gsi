@@ -95,6 +95,7 @@ order; `build/build-system.sh STAGE...` reruns single stages on
 |---|---|
 | `base` | Unpacks the TrebleDroid image and grows it to 4 GiB |
 | `gapps` | Adds MindTheGapps to `/system/product` and `/system/system_ext` |
+| `gmsquery` | Adds a static overlay listing Play services in `config_forceQueryablePackages` ([system/rro/XP8GmsQueryable/](../system/rro/XP8GmsQueryable/)) |
 | `apexfix` | Patches the tethering APEX ([system/apexfix/](../system/apexfix/)) |
 | `ims` | Adds the patched IMS app as `ImsCafXp8` ([system/ims/](../system/ims/)) |
 | `launcher3` | Patches Launcher3 ([system/launcher3/](../system/launcher3/)) |

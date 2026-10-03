@@ -156,7 +156,7 @@ fastboot, **STOP** and report it.
 **R11. Verify.**
 Run: `scripts/verify-device.sh` (ask the user to unlock with the PIN when it
 says so).
-Pass: `all automatic checks passed` (15 PASS). A WebView failure: rerun with
+Pass: `all automatic checks passed` (16 PASS). A WebView failure: rerun with
 `--fix-webview`. Any other FAIL: **STOP** and report the table.
 Then give the user the hand-check list the script prints, and ask for the
 results of one call and one SMS.

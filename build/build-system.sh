@@ -3,12 +3,13 @@
 # SPDX-License-Identifier: MIT
 #
 # Build out/system.img: TrebleDroid vanilla-old + MindTheGapps (replacing AOSP
-# QuickSearchBox) + tethering apex fix + ImsCafXp8 + Launcher3 (Taskbar, no
-# fixed first-screen search bar) and AuthService patches. Also writes
+# QuickSearchBox) + Play services force-queryable overlay + tethering apex fix +
+# ImsCafXp8 + Launcher3 (Taskbar, no fixed first-screen search bar) and
+# AuthService patches. Also writes
 # out/components/messaging/ (patched Messaging APK + its oat, for the vendor image).
 #
 # usage: build/build-system.sh [STAGE...]
-#   stages: base gapps apexfix ims launcher3 services messaging otacerts final
+#   stages: base gapps gmsquery apexfix ims launcher3 services messaging otacerts final
 #   (default: all, in that order; a partial run works on work/system/system.img)
 # Needs: build/fetch.sh td/ mtg/ ims/ sdk/ tools/ keys/
 set -euo pipefail
@@ -154,6 +155,22 @@ stage_gapps() {
     done < <(find "$CACHE/mtg" -type f | LC_ALL=C sort)
     q_rm_tree /system/product/app/QuickSearchBox
     q_commit
+}
+
+stage_gmsquery() {
+    log "gmsquery: static RRO adding Play services to config_forceQueryablePackages"
+    # Play services runs in its own uid (sharedUserMaxSdkVersion), and the framework reads
+    # forceQueryable from <application> only, where GmsCore does not set it.
+    local r=$W/gmsquery d=$PATCHES/rro/XP8GmsQueryable
+    rm -rf "$r" && mkdir -p "$r"
+    "$AAPT2" compile --dir "$d/res" -o "$r/res.zip"
+    "$AAPT2" link -o "$r/u.apk" --manifest "$d/AndroidManifest.xml" -I "$ANDROID_JAR" "$r/res.zip"
+    "$ZIPALIGN" -f -p 4 "$r/u.apk" "$r/a.apk"
+    sign_apk testkey "$r/a.apk" "$r/XP8GmsQueryable.apk"
+    q_begin
+    q_put "$r/XP8GmsQueryable.apk" /system/product/overlay/XP8GmsQueryable.apk "$SYS"
+    q_commit
+    rm -rf "$r"
 }
 
 stage_apexfix() {
@@ -379,7 +396,7 @@ stage_final() {
     (cd "$OUT" && sha256sum system.img)
 }
 
-all=(base gapps apexfix ims launcher3 services messaging otacerts final)
+all=(base gapps gmsquery apexfix ims launcher3 services messaging otacerts final)
 stages=("$@")
 [ ${#stages[@]} -gt 0 ] || stages=("${all[@]}")
 for s in "${stages[@]}"; do

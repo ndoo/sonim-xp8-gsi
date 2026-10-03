@@ -115,6 +115,8 @@ prov=$(sh_ pm path com.android.provision || true)
 check "AOSP Provision hidden" "pm path com.android.provision ${prov:-empty}" test -z "$prov"
 qsb=$(sh_ pm path com.android.quicksearchbox || true)
 check "AOSP QuickSearchBox removed" "pm path com.android.quicksearchbox ${qsb:-empty}" test -z "$qsb"
+fq=$(sh_ dumpsys package queries | sed -n '/^  forceQueryable:/,/^  [a-z]/p' | grep -cE 'com\.google\.android\.gms([],]|$)' || true)
+check "Play services visible" "forceQueryable entries for com.google.android.gms: ${fq:-0}" test "${fq:-0}" -gt 0
 
 echo
 echo "Automatic checks on $SERIAL"
