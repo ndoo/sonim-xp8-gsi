@@ -15,6 +15,7 @@ mechanism.
   - [Init script and boot-time fixes](#init-script-and-boot-time-fixes)
   - [System image changes](#system-image-changes)
 - [Bootloader unlock](#bootloader-unlock)
+- [A/B updates](#ab-updates)
 
 ## Device facts
 
@@ -33,9 +34,12 @@ mechanism.
 | EDL | Qualcomm 9008 in the boot ROM, reachable by keys from any state; needs the Sonim-signed firehose loader |
 | USB IDs | `05c6:9008` (EDL), `18d1:d00d` (fastboot) |
 
-Slot `_b` is not a fallback: its bootloader partitions carry the inactive
-type GUID and slot B was never set up. The scripts write slot `_a` only;
-`flash.sh` and `restore-stock.sh` check that `current-slot` is `a`.
+Both slots hold the same firmware on the supported build, except
+`mdtpsecapp_b` (a different build of the MDTP trusted app). `abl_b` holds the
+stock ABL. The inactive slot's partitions carry Qualcomm's inactive type
+GUID (`77036cd4-…`); a slot switch swaps the type GUIDs of every `_a`/`_b`
+pair. The install writes slot `_a`. Slot `_b` is used only after
+`scripts/enable-ab.sh` has prepared it, see [A/B updates](#ab-updates).
 
 ## Partitions
 
@@ -48,6 +52,8 @@ required partitions exist; `unlock.sh` checks the `abl_a` and `frp` sizes.
 | `system_a` | 4 GiB | Stock system with `/system/vendor`; the GSI goes here. `assemble.sh` reads the stock vendor tree, properties and libraries from the backup copy |
 | `vendor_a` | 1 GiB | Empty on stock; the assembled vendor image goes here |
 | `abl_a` | 1 MiB | Bootloader. `unlock.sh` writes the userdebug ABL; `--relock` writes the stock one back |
+| `abl_b`, `mdtpsecapp_b`, `modem_b` | 1 MiB, 4 MiB, 110 MiB | Slot-b firmware; `enable-ab.sh` writes the userdebug ABL and copies `mdtpsecapp_a` and `modem_a`. `--relock` writes the stock `abl_b` back |
+| `boot_b`, `system_b`, `vendor_b` | as slot a | Written by `flash.sh --slot b` or by `update_engine` (`ota-update.sh`) |
 | `frp` | 512 KiB | Factory Reset Protection data; the last byte (offset 524287) is the OEM-unlock flag |
 | `misc` | 1 MiB | Bootloader control block; stock content is all zeros |
 | `userdata` | about 46 GiB | Erased on install, formatted by `fs_mgr` on first boot |
@@ -60,7 +66,7 @@ Never written by any script: `xbl*`, `tz*`, `rpm*`, `hyp*`, `pmic*`,
 `keymaster*`, `keystore`, `devcfg*`, `cmnlib*`, `devinfo`. A bad keymaster
 write is the hard brick reported for this phone.
 
-`flash.sh` uses fixed sizes for `boot_a`, `vendor_a`, `system_a` and `misc`
+`flash.sh` uses fixed sizes for `boot`, `vendor`, `system` and `misc`
 because the userdebug ABL answers no `getvar partition-size` query.
 `fastboot` splits images larger than `max-download-size` (512 MiB) into
 sparse chunks.
@@ -205,3 +211,27 @@ Then `fastboot flashing unlock` sets the unlocked state and wipes userdata.
 `fastboot flashing lock` while the userdebug ABL is still in `abl_a`, then
 the stock `abl_a` and a zeroed `frp` over EDL
 ([restore.md](restore.md#relock-the-bootloader)).
+
+## A/B updates
+
+Releases carry an A/B OTA payload when CI holds the signing key
+(`build/make-ota.sh`, packed with [avbroot](https://github.com/chenxiaolong/avbroot)).
+The payload is a partial update holding only `system`, signed with the key
+whose certificate the system image carries in
+`/system/etc/security/otacerts.zip` (`build/ota/xp8-ota.x509.pem`). `boot`
+and `vendor` are built from each user's own backup, so no release can carry
+them. For partial updates `update_engine` adds a copy from the running slot
+for every partition in `ro.vendor.build.ab_ota_partitions`
+(`boot,system,vendor`, from the vendor image) that the payload omits.
+
+| Step | What runs |
+|---|---|
+| Prepare slot b once | `enable-ab.sh` over fastboot: userdebug ABL to `abl_b` (XBL loads the ABL of the active slot; the stock ABL has no `flash` or `set_active`), `mdtpsecapp_a` and `modem_a` to `_b` |
+| Install | `ota-update.sh`: `update_engine` writes `system` to the other slot, copies `boot` and `vendor`, and makes that slot active through the boot control HAL (`bootctrl.sdm660`) |
+| First boot | The ABL boots the new slot with retry count 7; `update_verifier` and `boot_control` mark it successful once Android has booted |
+| Fallback | A slot that is not marked successful after 7 boots is marked unbootable, and the ABL switches back to the previous slot |
+
+A dm-verity failure does not trigger the fallback: the ABL uses AVB 1.0 on
+this phone, and only AVB 2.0 failures mark a slot unbootable.
+`flash.sh --switch a` or `--switch b` changes the active slot from fastboot
+without writing.

@@ -17,6 +17,7 @@ warnings in the [README](../README.md) first. AI agents follow
   [7 First boot and verify](#7-first-boot-and-verify),
   [Switch root on or off](#switch-root-on-or-off),
   [Update to a newer release](#update-to-a-newer-release),
+  [Update over the air](#update-over-the-air-ab),
   [8 Restore to stock](#8-restore-to-stock)
 
 ## Overview
@@ -415,6 +416,41 @@ plus 5 s).
 
 If a command prints `unknown command` or hangs, hold Power 10-15 s; see
 [Fastboot stall](troubleshooting.md#fastboot-stall).
+
+### Update over the air (A/B)
+
+Releases that list `ota.json` among their assets can be installed while
+the phone runs, into the other slot. Your data, root choice, boot image and
+vendor image carry over; a failed update leaves the old slot to fall back
+to. This needs:
+
+- a vendor image assembled from a release with A/B OTA support (it sets
+  `ro.vendor.build.ab_ota_partitions`); update once as in
+  [Update to a newer release](#update-to-a-newer-release) if yours is older;
+- slot b prepared once (from fastboot, slot a active; writes `abl_b`,
+  `mdtpsecapp_b` and `modem_b`, nothing on slot a):
+
+  ```sh
+  scripts/enable-ab.sh --abl work/userdebug/abl.elf "$BACKUP"
+  ```
+
+Then, with the phone booted and USB debugging on:
+
+```sh
+scripts/ota-update.sh
+```
+
+It downloads the latest release's payload, checks its SHA-256, writes it
+to the other slot with `update_engine`, and reboots into that slot after
+you confirm. `--json FILE` installs a specific release's `ota.json`. To go
+back to the previous slot from fastboot without writing anything:
+
+```sh
+scripts/flash.sh --switch a     # or b
+```
+
+A vendor change in a release still needs the
+[PC update](#update-to-a-newer-release): the payload carries only `system`.
 
 ### 8. Restore to stock
 
