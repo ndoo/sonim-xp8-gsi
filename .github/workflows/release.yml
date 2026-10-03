@@ -37,6 +37,11 @@ jobs:
       - name: Build the build image
         run: docker build --platform linux/amd64 -t xp8-gsi-build build
 
+      - name: Expose the OTA key's presence
+        env:
+          OTA_PAYLOAD_KEY: ${{ secrets.OTA_PAYLOAD_KEY }}
+        run: '[ -z "$OTA_PAYLOAD_KEY" ] || echo "HAVE_OTA_KEY=1" >> "$GITHUB_ENV"'
+
       - name: Fetch inputs
         run: docker run --rm -v "$PWD:/src" xp8-gsi-build build/fetch.sh
 
@@ -45,6 +50,21 @@ jobs:
 
       - name: Build system.img
         run: docker run --rm -v "$PWD:/src" xp8-gsi-build build/build-system.sh
+
+      - name: Build OTA payload
+        if: env.HAVE_OTA_KEY == '1'
+        env:
+          OTA_PAYLOAD_KEY: ${{ secrets.OTA_PAYLOAD_KEY }}
+        run: |
+          tag=${GITHUB_REF_NAME}
+          [ "$GITHUB_REF_TYPE" = tag ] || tag=dryrun-$(date -u +%Y%m%d)
+          [ -f build/ota/xp8-ota.x509.pem ] ||
+            { echo "::error::OTA_PAYLOAD_KEY is set but build/ota/xp8-ota.x509.pem is missing"; exit 1; }
+          umask 077
+          printf '%s\n' "$OTA_PAYLOAD_KEY" > "$RUNNER_TEMP/ota.key"
+          docker run --rm -v "$PWD:/src" -v "$RUNNER_TEMP:/keys:ro" -e OTA_KEY=/keys/ota.key \
+            xp8-gsi-build build/make-ota.sh "$tag"
+          rm -f "$RUNNER_TEMP/ota.key"
 
       - name: Package
         run: |

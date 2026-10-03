@@ -33,6 +33,9 @@ tools/baksmali.jar https://raw.githubusercontent.com/LineageOS/android_prebuilts
 # patchelf 0.19.1 (Debian's 0.18 lays out libgui_vendor.so differently from the reference image)
 tools/patchelf-0.19.1-x86_64.tar.gz https://github.com/NixOS/patchelf/releases/download/0.19.1/patchelf-0.19.1-x86_64.tar.gz a6818fef80128fb354423234ecacdcca3e993913d774e5d8346bc63f70fed4cf
 
+# avbroot 3.34.1: packs and signs the A/B OTA payload (build/make-ota.sh)
+ota/avbroot-3.34.1-x86_64-unknown-linux-gnu.zip https://github.com/chenxiaolong/avbroot/releases/download/v3.34.1/avbroot-3.34.1-x86_64-unknown-linux-gnu.zip b1740ebf92d503cf2e81ca443afa4b615fb97ec365e170b71791ed72d9e559f8
+
 # MindTheGapps 16 (baklava) at f8cdcffc2fb9181b8cc5a9b02d4b5908b64e5cdd: {common,arm64}/proprietary/<partition path>
 mtg/product/app/GoogleCalendarSyncAdapter/GoogleCalendarSyncAdapter.apk https://gitlab.com/MindTheGapps/vendor_gapps/-/raw/f8cdcffc2fb9181b8cc5a9b02d4b5908b64e5cdd/common/proprietary/product/app/GoogleCalendarSyncAdapter/GoogleCalendarSyncAdapter.apk 0b3aa6f8d4bc16645b26136dbc228f3a0fe503c01f54892f577715f61e3ef5a7
 mtg/product/app/GoogleContactsSyncAdapter/GoogleContactsSyncAdapter.apk https://gitlab.com/MindTheGapps/vendor_gapps/-/raw/f8cdcffc2fb9181b8cc5a9b02d4b5908b64e5cdd/common/proprietary/product/app/GoogleContactsSyncAdapter/GoogleContactsSyncAdapter.apk 5396a4ddf818f69a51d34a10ab23c8356add171ef2394f5bbca9e63b74594f4e

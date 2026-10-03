@@ -8,7 +8,7 @@
 # out/components/messaging/ (patched Messaging APK + its oat, for the vendor image).
 #
 # usage: build/build-system.sh [STAGE...]
-#   stages: base gapps apexfix ims launcher3 services messaging final
+#   stages: base gapps apexfix ims launcher3 services messaging otacerts final
 #   (default: all, in that order; a partial run works on work/system/system.img)
 # Needs: build/fetch.sh td/ mtg/ ims/ sdk/ tools/ keys/
 set -euo pipefail
@@ -35,6 +35,13 @@ if [ -n "${APEX_KEY:-}" ]; then
         || { echo "APEX_KEY=$APEX_KEY: not a readable RSA-4096 private key" >&2; exit 1; }
 else
     APEX_KEY=$KEYS/com.android.tethering.pem
+fi
+# OTA_CERT: x509 PEM that A/B OTA payloads are signed for (otacerts stage);
+# defaults to the project's certificate once one is committed.
+[ -n "${OTA_CERT:-}" ] || [ ! -f "$ROOT/build/ota/xp8-ota.x509.pem" ] || OTA_CERT=$ROOT/build/ota/xp8-ota.x509.pem
+if [ -n "${OTA_CERT:-}" ]; then
+    openssl x509 -in "$OTA_CERT" -noout 2>/dev/null \
+        || { echo "OTA_CERT=$OTA_CERT: not a readable x509 PEM certificate" >&2; exit 1; }
 fi
 
 log() { echo "== $*"; }
@@ -351,6 +358,20 @@ stage_messaging() {
     rm -rf "$m"
 }
 
+stage_otacerts() {
+    [ -n "${OTA_CERT:-}" ] || { log "otacerts: no OTA_CERT, keeping TrebleDroid's"; return; }
+    log "otacerts: update_engine accepts payloads signed for $(basename "$OTA_CERT")"
+    local o=$W/otacerts
+    rm -rf "$o" && mkdir -p "$o"
+    cp "$OTA_CERT" "$o/xp8-ota.x509.pem"
+    python3 "$ROOT/build/lib/otacerts.py" "$o/otacerts.zip" "$o/xp8-ota.x509.pem"
+    q_begin
+    q "rm /system/etc/security/otacerts.zip"
+    q_put "$o/otacerts.zip" /system/etc/security/otacerts.zip "$SYS"
+    q_commit
+    rm -rf "$o"
+}
+
 stage_final() {
     log "final: fsck and out/system.img"
     e2fsck -fn "$IMG" >/dev/null 2>&1
@@ -358,7 +379,7 @@ stage_final() {
     (cd "$OUT" && sha256sum system.img)
 }
 
-all=(base gapps apexfix ims launcher3 services messaging final)
+all=(base gapps apexfix ims launcher3 services messaging otacerts final)
 stages=("$@")
 [ ${#stages[@]} -gt 0 ] || stages=("${all[@]}")
 for s in "${stages[@]}"; do
