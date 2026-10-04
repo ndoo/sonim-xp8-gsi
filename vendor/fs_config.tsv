@@ -14,7 +14,10 @@
 # path	mode	uid	gid	selinux	source
 lost+found	40700	0	0	u:object_r:vendor_file:s0	-
 app/CACertService/oat	-	-	-	-	remove
+app/XP8Buttons	40755	0	0	u:object_r:vendor_app_file:s0	-
+app/XP8Buttons/XP8Buttons.apk	100644	0	0	u:object_r:vendor_app_file:s0	comp:XP8Buttons.apk
 bin/xp8-gsi.sh	100755	0	2000	u:object_r:vendor_file:s0	repo:vendor/xp8-gsi.sh
+bin/xp8-keys.sh	100755	0	2000	u:object_r:vendor_file:s0	repo:vendor/keys/xp8-keys.sh
 etc/cgroups.json	100644	0	0	u:object_r:vendor_configs_file:s0	repo:vendor/cgroups.json
 etc/init/xp8-gsi.rc	100644	0	0	u:object_r:vendor_configs_file:s0	repo:vendor/xp8-gsi.rc
 etc/vintf/manifest/android.hardware.vibrator-xp8.xml	100644	0	0	u:object_r:vendor_configs_file:s0	comp:android.hardware.vibrator-xp8.xml
@@ -26,6 +29,7 @@ etc/xp8/messaging/oat	40755	0	0	u:object_r:system_file:s0	-
 etc/xp8/messaging/oat/arm64	40755	0	0	u:object_r:system_file:s0	-
 etc/xp8/messaging/oat/arm64/messaging.odex	100644	0	0	u:object_r:system_file:s0	comp:messaging/oat/arm64/messaging.odex
 etc/xp8/messaging/oat/arm64/messaging.vdex	100644	0	0	u:object_r:system_file:s0	comp:messaging/oat/arm64/messaging.vdex
+etc/xp8/xp8-keys.dex	100644	0	0	u:object_r:vendor_file:s0	comp:xp8-keys.dex
 etc/xp8/xp8-vibrator	100755	0	0	u:object_r:vendor_file:s0	comp:xp8-vibrator
 lib/libxp8shim.so	100777	0	0	u:object_r:same_process_hal_file:s0	comp:libxp8shim.so
 overlay/XP8FrameworksRes.apk	100644	0	0	u:object_r:vendor_overlay_file:s0	comp:XP8FrameworksRes.apk

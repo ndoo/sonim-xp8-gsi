@@ -34,6 +34,7 @@ unpack_sdk() {
     AAPT2=$UNP/build-tools/aapt2
     ZIPALIGN=$UNP/build-tools/zipalign
     APKSIGNER=(java -jar "$UNP/build-tools/lib/apksigner.jar")
+    D8=(java -cp "$UNP/build-tools/lib/d8.jar" com.android.tools.r8.D8)
     ANDROID_JAR=$UNP/android-36/android.jar
 }
 

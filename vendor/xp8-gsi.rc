@@ -8,6 +8,16 @@ service xp8-gsi /vendor/bin/xp8-gsi.sh
 
 on property:sys.boot_completed=1
     start xp8-gsi
+    start vendor.xp8-keys
+
+# Side keys (PTT, SOS, camera) as on stock: Sonim's SPCCService, which handled them, is a
+# system app the GSI cannot install. Restarted by init if it exits.
+service vendor.xp8-keys /vendor/bin/xp8-keys.sh
+    class late_start
+    user root
+    group root input audio
+    disabled
+    seclabel u:r:su:s0
 
 # TrebleDroid rw-system.sh (post-fs) masks libpdx_default_transport.so; the stock OMX HAL needs it.
 on late-fs
