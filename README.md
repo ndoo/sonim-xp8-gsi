@@ -72,6 +72,7 @@ repository builds (TrebleDroid `ci-20250617`, MindTheGapps 16, stock kernel
 | Location | Compass | ✅ | |
 | Hardware | Fingerprint enrol and unlock | ✅ | Sensor in the Home button |
 | Hardware | Speaker: ringtone, calls, media | ✅ | |
+| Hardware | Microphone in push-to-talk apps (Zello) | ✅ | Handset mic level lowered 8 dB so speech at PTT distance is not limited; see [technical.md](docs/technical.md#vendor-image) |
 | Hardware | Vibration | ✅ | |
 | Hardware | Back, Home and Recents keys | ✅ | No on-screen navigation bar |
 | Hardware | PTT and SOS keys | ❔ | No action assigned |
