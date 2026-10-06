@@ -17,7 +17,7 @@ RUN apt-get update \
       e2fsprogs \
       file \
       git \
-      openjdk-21-jre-headless \
+      openjdk-21-jdk-headless \
       openssl \
       patch \
       patchelf \

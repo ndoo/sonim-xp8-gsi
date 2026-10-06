@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Andrew Yong
 # SPDX-License-Identifier: MIT
 #
-# Build the MIT components (shim, vibrator, RROs) into out/components.
+# Build the MIT components (shim, vibrator, RROs, side keys) into out/components.
 # Needs: build/fetch.sh sdk/ tools/ keys/
 set -euo pipefail
 
@@ -49,5 +49,20 @@ for d in "$SRC"/rro/*/; do
     sign_apk testkey "$r/a.apk" "$C/$n.apk"
 done
 
+# Side keys: the daemon (vendor/keys/Xp8Keys.java, run with app_process) and the
+# XP8 Buttons settings app, signed with the AOSP testkey.
+K=$W/keys && mkdir -p "$K/daemon" "$K/app"
+javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$K/daemon" "$SRC/keys/Xp8Keys.java"
+"${D8[@]}" --release --min-api 29 --lib "$ANDROID_JAR" --output "$K/daemon" "$K"/daemon/*.class
+cp "$K/daemon/classes.dex" "$C/xp8-keys.dex"
+"$AAPT2" link -o "$K/u.apk" --manifest "$SRC/keys/app/AndroidManifest.xml" -I "$ANDROID_JAR"     --min-sdk-version 29 --target-sdk-version 35 --version-code 1 --version-name 1.0
+mapfile -t java < <(find "$SRC/keys/app/src" -name '*.java' | sort)
+javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$K/app" "${java[@]}"
+mapfile -t classes < <(find "$K/app" -name '*.class' | sort)
+"${D8[@]}" --release --min-api 29 --lib "$ANDROID_JAR" --output "$K" "${classes[@]}"
+(cd "$K" && zip -q -X u.apk classes.dex)
+"$ZIPALIGN" -f -p 4 "$K/u.apk" "$K/a.apk"
+sign_apk testkey "$K/a.apk" "$C/XP8Buttons.apk"
+
 rm -rf "$W"
-(cd "$C" && sha256sum ./*.so ./*.apk xp8-vibrator ./*.xml)
+(cd "$C" && sha256sum ./*.so ./*.apk ./*.dex xp8-vibrator ./*.xml)

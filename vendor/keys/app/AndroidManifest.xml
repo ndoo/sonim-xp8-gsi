@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 no0406
+     SPDX-License-Identifier: MIT
+
+     XP8 Buttons: chooses what the XP8 side keys do. The side-key daemon
+     (vendor/keys/Xp8Keys.java) reads files/keys.properties and acts on it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="sg.ndoo.xp8.buttons">
+
+    <queries>
+        <intent>
+            <action android:name="com.sonim.intent.action.PTT_KEY_DOWN" />
+        </intent>
+        <intent>
+            <action android:name="com.sonim.intent.action.SOS_KEY_DOWN" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:label="XP8 Buttons"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:theme="@android:style/Theme.DeviceDefault.DayNight"
+        android:allowBackup="false">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <!-- Sent by the daemon (root) for the "Flashlight on/off" action. -->
+        <receiver
+            android:name=".TorchReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="sg.ndoo.xp8.buttons.TORCH" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
