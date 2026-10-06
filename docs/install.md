@@ -26,9 +26,10 @@ warnings in the [README](../README.md) first. AI agents follow
   shipped. It supplies the proprietary inputs: the stock kernel in `boot_a`,
   and `/system/vendor` and the extra libraries inside `system_a`.
 - **Release components:** the GitHub release assets: `system.img.xz` (the
-  GSI with Google apps), `xp8-gsi-components-<tag>.tar.xz` (MIT-licensed
-  prebuilt parts: `libxp8shim.so`, the overlay APKs, the vibrator service,
-  the patched Messaging APK), and `SHA256SUMS`.
+  GSI with Google apps, the XP8 overlays, side keys and boot scripts),
+  `xp8-gsi-components-<tag>.tar.xz` (MIT-licensed prebuilt parts; the
+  vendor image takes `libxp8shim.so` and the vibrator service from it), and
+  `SHA256SUMS`.
 - **`scripts/assemble.sh`:** combines the release components with your stock
   backup on your computer and writes `out/boot.img` and `out/vendor.img`.
   These contain Sonim and Qualcomm files from your phone; do not share them.
@@ -449,8 +450,12 @@ back to the previous slot from fastboot without writing anything:
 scripts/flash.sh --switch a     # or b
 ```
 
-A vendor change in a release still needs the
-[PC update](#update-to-a-newer-release): the payload carries only `system`.
+The payload carries only `system`. The overlays, side keys, boot scripts
+and audio patches are on `system`, so their changes arrive over the air.
+Only a release that changes what stays in `vendor` (fstab, vendor
+properties, the shim library, the vibrator HAL) needs the
+[PC update](#update-to-a-newer-release); its `ota.json` then asks for a
+higher `ro.vendor.xp8.layout`, and `ota-update.sh` stops and says so.
 
 ### 8. Restore to stock
 

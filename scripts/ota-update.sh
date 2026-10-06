@@ -33,14 +33,14 @@ done
 require_serial
 need_tools adb curl
 mkdir -p "$WORK"
-if [ -f "$JSON" ]; then cp "$JSON" "$WORK/ota.json"
+if [ -f "$JSON" ]; then [ "$JSON" -ef "$WORK/ota.json" ] || cp "$JSON" "$WORK/ota.json"
 else curl -fsSL -o "$WORK/ota.json" "$JSON" || die "cannot fetch $JSON"; fi
-{ read -r TAG; read -r URL; read -r SIZE; read -r SUM; } < <(py3 - "$WORK/ota.json" "$WORK/headers" <<'PY'
+{ read -r TAG; read -r URL; read -r SIZE; read -r SUM; read -r LAYOUT; } < <(py3 - "$WORK/ota.json" "$WORK/headers" <<'PY'
 import json, sys
 j = json.load(open(sys.argv[1]))
 p = j["payload"]
 open(sys.argv[2], "w").write(p["headers"].strip() + "\n")
-print(j["tag"], p["url"], p["size"], p["sha256"], sep="\n")
+print(j["tag"], p["url"], p["size"], p["sha256"], j.get("min_vendor_layout", 1), sep="\n")
 PY
 )
 PAYLOAD=$WORK/$(basename "$URL")
@@ -63,6 +63,8 @@ CUR=$(prop ro.boot.slot_suffix)
 case $CUR in _a) NEXT=b ;; _b) NEXT=a ;; *) die "no ro.boot.slot_suffix on $SERIAL; stop" ;; esac
 [[ ",$(prop ro.vendor.build.ab_ota_partitions)," == *,boot,*vendor,* ]] ||
     die "this vendor image has no A/B OTA support (ro.vendor.build.ab_ota_partitions); assemble and flash this release's vendor first"
+[ "$(prop ro.vendor.xp8.layout | grep -x '[0-9]*' || echo 1)" -ge "$LAYOUT" ] ||
+    die "$TAG needs a newer vendor image (ro.vendor.xp8.layout $LAYOUT); update from a computer once (docs/install.md#update-to-a-newer-release), then OTA works again"
 avail=$(A shell df -k /data | awk 'NR == 2 {print $4}' | tr -d '\r')
 [ "${avail:-0}" -gt $((SIZE / 1024 + 524288)) ] || die "/data has ${avail:-0} KiB free; the payload needs $((SIZE / 1024)) KiB plus 512 MiB"
 

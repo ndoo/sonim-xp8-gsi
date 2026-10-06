@@ -87,7 +87,7 @@ is otherwise signed with the same test keys.
   test key.
 
 [build/build-system.sh](../build/build-system.sh) writes `out/system.img`
-(4 GiB raw ext4) and `out/components/messaging/`. It runs these stages in
+(4 GiB raw ext4); run `build-components.sh` first. It runs these stages in
 order; `build/build-system.sh STAGE...` reruns single stages on
 `work/system/system.img`:
 
@@ -100,7 +100,8 @@ order; `build/build-system.sh STAGE...` reruns single stages on
 | `ims` | Adds the patched IMS app as `ImsCafXp8` ([system/ims/](../system/ims/)) |
 | `launcher3` | Patches Launcher3 ([system/launcher3/](../system/launcher3/)) |
 | `services` | Patches `AuthService` in `services.jar` ([system/services/](../system/services/)) |
-| `messaging` | Builds the Messaging APK with two more permissions ([system/messaging/](../system/messaging/)) into `out/components/messaging/` |
+| `messaging` | Replaces the Messaging APK with one that has two more permissions ([system/messaging/](../system/messaging/)) |
+| `xp8` | Removes AOSP Provision; adds the overlays, `XP8Buttons.apk` and `xp8-keys.dex` from `out/components/`, `xp8-gsi.rc`, the boot scripts and the [vendor/audio/](../vendor/audio/) diffs |
 | `final` | Checks the filesystem and moves the image to `out/system.img` |
 
 The reason for each change is in

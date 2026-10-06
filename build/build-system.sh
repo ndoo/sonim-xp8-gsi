@@ -5,13 +5,13 @@
 # Build out/system.img: TrebleDroid vanilla-old + MindTheGapps (replacing AOSP
 # QuickSearchBox) + Play services force-queryable overlay + tethering apex fix +
 # ImsCafXp8 + Launcher3 (Taskbar, no fixed first-screen search bar) and
-# AuthService patches. Also writes
-# out/components/messaging/ (patched Messaging APK + its oat, for the vendor image).
+# AuthService patches + patched Messaging, without AOSP Provision + the XP8
+# overlays, side keys and boot scripts from out/components.
 #
 # usage: build/build-system.sh [STAGE...]
-#   stages: base gapps gmsquery apexfix ims launcher3 services messaging otacerts final
+#   stages: base gapps gmsquery apexfix ims launcher3 services messaging xp8 otacerts final
 #   (default: all, in that order; a partial run works on work/system/system.img)
-# Needs: build/fetch.sh td/ mtg/ ims/ sdk/ tools/ keys/
+# Needs: build/fetch.sh td/ mtg/ ims/ sdk/ tools/ keys/, then build/build-components.sh
 set -euo pipefail
 
 # shellcheck source-path=SCRIPTDIR source=lib/tools.sh
@@ -353,15 +353,11 @@ stage_services() {
     rm -rf "$s"
 }
 
-# Vendor-side artefact: /vendor/etc/xp8/messaging is bind-mounted over
-# /system/product/app/messaging, so it is built from this image's copy.
 stage_messaging() {
-    log "messaging: add RECEIVE_WAP_PUSH/READ_CELL_BROADCASTS (out/components/messaging)"
-    local m=$W/messaging d=/system/product/app/messaging c=$OUT/components/messaging
-    rm -rf "$m" "$c" && mkdir -p "$m/m" "$c/oat/arm64"
+    log "messaging: add RECEIVE_WAP_PUSH/READ_CELL_BROADCASTS"
+    local m=$W/messaging d=/system/product/app/messaging
+    rm -rf "$m" && mkdir -p "$m/m"
     dump "$d/messaging.apk" "$m/orig.apk"
-    dump "$d/oat/arm64/messaging.odex" "$c/oat/arm64/messaging.odex"
-    dump "$d/oat/arm64/messaging.vdex" "$c/oat/arm64/messaging.vdex"
     "${APKTOOL[@]}" d -s -f -o "$m/dec" "$m/orig.apk" >/dev/null
     # apktool otherwise rewrites targetSdk 24 to 36 (minSdk 36 > targetSdk).
     sed -i '/^sdkInfo:/,/targetSdkVersion/d' "$m/dec/apktool.yml"
@@ -371,8 +367,40 @@ stage_messaging() {
     python3 "$ROOT/build/lib/zipreplace.py" "$m/orig.apk" "$m/u.apk" --drop-v1-sig \
         AndroidManifest.xml="$m/m/AndroidManifest.xml"
     "$ZIPALIGN" -f -p 4 "$m/u.apk" "$m/a.apk"
-    sign_apk platform "$m/a.apk" "$c/messaging.apk"
+    sign_apk platform "$m/a.apk" "$m/messaging.apk"
+    q_begin
+    q "rm $d/messaging.apk"
+    q_put "$m/messaging.apk" "$d/messaging.apk" "$SYS"
+    q_commit
     rm -rf "$m"
+}
+
+# Repo-owned device files live on system so that A/B OTA payloads carry them;
+# vendor.img keeps what is built from stock. They act only on a vendor that sets
+# ro.vendor.xp8.layout=2 (see vendor/xp8-gsi.rc).
+stage_xp8() {
+    log "xp8: overlays, side keys, boot scripts and vendor config patches; no Provision"
+    local c=$OUT/components f
+    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk xp8-keys.dex; do
+        [ -f "$c/$f" ] || { echo "missing $c/$f: run build/build-components.sh" >&2; exit 1; }
+    done
+    q_begin
+    # With AOSP Provision, two activities handle SETUP_WIZARD and Google SetupWizard gets no grants.
+    q_rm_tree /system/system_ext/priv-app/Provision
+    for f in XP8FrameworksRes XP8Settings XP8SystemUI; do
+        q_put "$c/$f.apk" "/system/product/overlay/$f.apk" "$SYS"
+    done
+    q_put "$c/XP8Buttons.apk" /system/product/app/XP8Buttons/XP8Buttons.apk "$SYS"
+    q_put "$c/xp8-keys.dex" /system/etc/xp8/xp8-keys.dex "$SYS"
+    q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
+    for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh; do
+        q_put "$ROOT/vendor/$f" "/system/bin/${f##*/}" "$SYS"
+        q_meta "/system/bin/${f##*/}" 0100755 "$SYS"
+    done
+    for f in "$ROOT"/vendor/audio/*.diff; do
+        q_put "$f" "/system/etc/xp8/vendor-patches/${f##*/}" "$SYS"
+    done
+    q_commit
 }
 
 stage_otacerts() {
@@ -396,7 +424,7 @@ stage_final() {
     (cd "$OUT" && sha256sum system.img)
 }
 
-all=(base gapps gmsquery apexfix ims launcher3 services messaging otacerts final)
+all=(base gapps gmsquery apexfix ims launcher3 services messaging xp8 otacerts final)
 stages=("$@")
 [ ${#stages[@]} -gt 0 ] || stages=("${all[@]}")
 for s in "${stages[@]}"; do
