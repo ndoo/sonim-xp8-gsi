@@ -435,7 +435,12 @@ to. This needs:
   scripts/enable-ab.sh --abl work/userdebug/abl.elf "$BACKUP"
   ```
 
-Then, with the phone booted and USB debugging on:
+Then open **Settings → System → System update**. It checks the latest
+release and offers **Download & install**: `update_engine` streams the
+payload from GitHub into the other slot while you use the phone, and
+**Restart now** boots it. No computer or root is needed.
+
+From a computer instead, with the phone booted and USB debugging on:
 
 ```sh
 scripts/ota-update.sh
@@ -455,7 +460,8 @@ and audio patches are on `system`, so their changes arrive over the air.
 Only a release that changes what stays in `vendor` (fstab, vendor
 properties, the shim library, the vibrator HAL) needs the
 [PC update](#update-to-a-newer-release); its `ota.json` then asks for a
-higher `ro.vendor.xp8.layout`, and `ota-update.sh` stops and says so.
+higher `ro.vendor.xp8.layout`, and System update and `ota-update.sh` stop
+and say so.
 
 ### 8. Restore to stock
 

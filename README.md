@@ -36,8 +36,7 @@ been tested.
 
 > [!WARNING]
 > The result runs with SELinux permissive and the stock kernel's 2020-09
-> security patch level. Updates install from a computer, not from the phone
-> itself. With root, any app you grant `su` has full control of the phone.
+> security patch level. With root, any app you grant `su` has full control of the phone.
 
 > [!IMPORTANT]
 > Only the tested stock build is supported. Carrier locks live in the modem
@@ -81,7 +80,7 @@ repository builds (TrebleDroid `ci-20250617`, MindTheGapps 16, stock kernel
 | System | Google setup wizard and Play Store | ✅ | |
 | System | Root with Magisk 30.7 | ✅ | Optional; everything above also works without root, see [Root is your choice](#root-is-your-choice) |
 | System | SELinux enforcing | ❌ | Runs permissive |
-| System | OTA updates | ⚠️ | A/B updates of the system image from a computer over adb (`scripts/ota-update.sh`), no root needed; a release that changes the vendor image is flashed from the computer. See [Update over the air](docs/install.md#update-over-the-air-ab) |
+| System | OTA updates | ⚠️ | A/B updates from Settings → System → System update, no root needed; a release that changes what stays in the vendor image is flashed from a computer. See [Update over the air](docs/install.md#update-over-the-air-ab) |
 | System | Security patches | ⚠️ | The Android 16 GSI is current, but the kernel stays at the 2020-09 patch level; Sonim has not published its source |
 
 ## Supported devices

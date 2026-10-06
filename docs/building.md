@@ -84,7 +84,10 @@ is otherwise signed with the same test keys.
   [vendor/vibrator/](../vendor/vibrator/);
 - the overlay APKs `XP8FrameworksRes.apk`, `XP8Settings.apk` and
   `XP8SystemUI.apk` from [vendor/rro/](../vendor/rro/), signed with the AOSP
-  test key.
+  test key;
+- the System update app `XP8Updater.apk` from
+  [vendor/updater/](../vendor/updater/), compiled against the `UpdateEngine`
+  stubs in `vendor/updater/stubs` and signed with the AOSP platform key.
 
 [build/build-system.sh](../build/build-system.sh) writes `out/system.img`
 (4 GiB raw ext4); run `build-components.sh` first. It runs these stages in
@@ -101,7 +104,7 @@ order; `build/build-system.sh STAGE...` reruns single stages on
 | `launcher3` | Patches Launcher3 ([system/launcher3/](../system/launcher3/)) |
 | `services` | Patches `AuthService` in `services.jar` ([system/services/](../system/services/)) |
 | `messaging` | Replaces the Messaging APK with one that has two more permissions ([system/messaging/](../system/messaging/)) |
-| `xp8` | Removes AOSP Provision; adds the overlays, `XP8Buttons.apk` and `xp8-keys.dex` from `out/components/`, `xp8-gsi.rc`, the boot scripts and the [vendor/audio/](../vendor/audio/) diffs |
+| `xp8` | Removes AOSP Provision; adds the overlays, `XP8Buttons.apk`, the System update app `XP8Updater.apk` and `xp8-keys.dex` from `out/components/`, `xp8-gsi.rc`, the boot scripts and the [vendor/audio/](../vendor/audio/) diffs; sets `ro.xp8.release` from `XP8_RELEASE` (default `dev`) |
 | `final` | Checks the filesystem and moves the image to `out/system.img` |
 
 The reason for each change is in

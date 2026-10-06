@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Andrew Yong
+     SPDX-License-Identifier: MIT
+
+     XP8 System update: Settings > System > System update. Installs the latest
+     release's A/B OTA payload with update_engine. Platform-signed. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="sg.ndoo.xp8.updater">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REBOOT" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@android:drawable/stat_sys_download"
+        android:theme="@android:style/Theme.DeviceDefault.DayNight"
+        android:allowBackup="false">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <!-- Above Play services' SystemUpdateActivity (priority 1); privileged apps only. -->
+            <intent-filter android:priority="100">
+                <action android:name="android.settings.SYSTEM_UPDATE_SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

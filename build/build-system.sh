@@ -6,7 +6,8 @@
 # QuickSearchBox) + Play services force-queryable overlay + tethering apex fix +
 # ImsCafXp8 + Launcher3 (Taskbar, no fixed first-screen search bar) and
 # AuthService patches + patched Messaging, without AOSP Provision + the XP8
-# overlays, side keys and boot scripts from out/components.
+# overlays, side keys, System update app and boot scripts from out/components;
+# XP8_RELEASE (the release tag, default dev) becomes ro.xp8.release.
 #
 # usage: build/build-system.sh [STAGE...]
 #   stages: base gapps gmsquery apexfix ims launcher3 services messaging xp8 otacerts final
@@ -381,7 +382,7 @@ stage_messaging() {
 stage_xp8() {
     log "xp8: overlays, side keys, boot scripts and vendor config patches; no Provision"
     local c=$OUT/components f
-    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk xp8-keys.dex; do
+    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk XP8Updater.apk xp8-keys.dex; do
         [ -f "$c/$f" ] || { echo "missing $c/$f: run build/build-components.sh" >&2; exit 1; }
     done
     q_begin
@@ -391,6 +392,14 @@ stage_xp8() {
         q_put "$c/$f.apk" "/system/product/overlay/$f.apk" "$SYS"
     done
     q_put "$c/XP8Buttons.apk" /system/product/app/XP8Buttons/XP8Buttons.apk "$SYS"
+    q_put "$c/XP8Updater.apk" /system/system_ext/priv-app/XP8Updater/XP8Updater.apk "$SYS"
+    q_put "$ROOT/vendor/updater/privapp-permissions-xp8updater.xml" \
+        /system/system_ext/etc/permissions/privapp-permissions-xp8updater.xml "$SYS"
+    # XP8Updater compares ro.xp8.release with the tag in the latest ota.json.
+    dump /system/build.prop "$W/build.prop"
+    printf '\n# XP8 GSI release\nro.xp8.release=%s\n' "${XP8_RELEASE:-dev}" >> "$W/build.prop"
+    q "rm /system/build.prop"
+    q_put "$W/build.prop" /system/build.prop "$SYS"
     q_put "$c/xp8-keys.dex" /system/etc/xp8/xp8-keys.dex "$SYS"
     q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
     for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh; do
