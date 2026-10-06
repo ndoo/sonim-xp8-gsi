@@ -9,7 +9,7 @@ SPDX-FileCopyrightText = "The Android Open Source Project; 2026 Andrew Yong"
 SPDX-License-Identifier = "Apache-2.0"
 
 [[annotations]]
-path = ["LICENSE", ".gitignore", ".gitattributes", "docs/**", "README.md", "NOTICE.md", "build/inputs.lock", "build/ota/xp8-ota.x509.pem", "vendor/**.txt", "vendor/**.json", "vendor/**.prop", "vendor/**.diff", "vendor/rro/**", "system/rro/**", "vendor/xp8-gsi.rc", "vendor/xp8-gsi.sh"]
+path = ["LICENSE", ".gitignore", ".gitattributes", "docs/**", "README.md", "AGENTS.md", "NOTICE.md", "build/inputs.lock", "build/ota/xp8-ota.x509.pem", "vendor/**.txt", "vendor/**.json", "vendor/**.prop", "vendor/**.diff", "vendor/rro/**", "system/rro/**", "vendor/xp8-gsi.rc", "vendor/xp8-gsi.sh"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Andrew Yong"
 SPDX-License-Identifier = "MIT"
