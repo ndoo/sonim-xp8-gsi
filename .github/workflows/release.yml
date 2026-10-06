@@ -49,7 +49,10 @@ jobs:
         run: docker run --rm -v "$PWD:/src" xp8-gsi-build build/build-components.sh
 
       - name: Build system.img
-        run: docker run --rm -v "$PWD:/src" xp8-gsi-build build/build-system.sh
+        run: |
+          tag=${GITHUB_REF_NAME}
+          [ "$GITHUB_REF_TYPE" = tag ] || tag=dryrun-$(date -u +%Y%m%d)
+          docker run --rm -e XP8_RELEASE="$tag" -v "$PWD:/src" xp8-gsi-build build/build-system.sh
 
       - name: Build OTA payload
         if: env.HAVE_OTA_KEY == '1'

@@ -74,7 +74,8 @@ python3 - "$O/ota.json" "$TAG" "$URL_BASE/$BIN" "$size" "$sum" "$syssum" "$O/$PR
 import json, sys
 out, tag, url, size, sha, syssha, props = sys.argv[1:]
 headers = open(props).read().strip()
-json.dump({"tag": tag, "system_sha256": syssha,
+# min_vendor_layout: ro.vendor.xp8.layout the installed vendor.img must report.
+json.dump({"tag": tag, "system_sha256": syssha, "min_vendor_layout": 2,
            "payload": {"url": url, "size": int(size), "sha256": sha, "headers": headers}},
           open(out, "w"), indent=2)
 PY

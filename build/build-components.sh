@@ -60,9 +60,26 @@ mapfile -t java < <(find "$SRC/keys/app/src" -name '*.java' | sort)
 javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$K/app" "${java[@]}"
 mapfile -t classes < <(find "$K/app" -name '*.class' | sort)
 "${D8[@]}" --release --min-api 29 --lib "$ANDROID_JAR" --output "$K" "${classes[@]}"
+touch -d "@${SOURCE_DATE_EPOCH:-1750118400}" "$K/classes.dex"
 (cd "$K" && zip -q -X u.apk classes.dex)
 "$ZIPALIGN" -f -p 4 "$K/u.apk" "$K/a.apk"
 sign_apk testkey "$K/a.apk" "$C/XP8Buttons.apk"
+
+# System update app, platform-signed for UpdateEngine and REBOOT; vendor/updater/stubs
+# stand in for the @SystemApi classes at compile time only.
+U=$W/updater && mkdir -p "$U/stubs" "$U/app" "$U/gen"
+javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$U/stubs" "$SRC"/updater/stubs/android/os/*.java
+"$AAPT2" compile --dir "$SRC/updater/res" -o "$U/res.zip"
+"$AAPT2" link -o "$U/u.apk" --manifest "$SRC/updater/AndroidManifest.xml" -I "$ANDROID_JAR" \
+    --java "$U/gen" --min-sdk-version 29 --target-sdk-version 34 --version-code 1 --version-name 1.0 "$U/res.zip"
+mapfile -t java < <(find "$SRC/updater/src" "$U/gen" -name '*.java' | sort)
+javac --release 11 -Xlint:-options -cp "$ANDROID_JAR:$U/stubs" -d "$U/app" "${java[@]}"
+mapfile -t classes < <(find "$U/app" -name '*.class' | sort)
+"${D8[@]}" --release --min-api 29 --lib "$ANDROID_JAR" --classpath "$U/stubs" --output "$U" "${classes[@]}"
+touch -d "@${SOURCE_DATE_EPOCH:-1750118400}" "$U/classes.dex"
+(cd "$U" && zip -q -X u.apk classes.dex)
+"$ZIPALIGN" -f -p 4 "$U/u.apk" "$U/a.apk"
+sign_apk platform "$U/a.apk" "$C/XP8Updater.apk"
 
 rm -rf "$W"
 (cd "$C" && sha256sum ./*.so ./*.apk ./*.dex xp8-vibrator ./*.xml)

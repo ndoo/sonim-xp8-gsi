@@ -11,3 +11,6 @@ ro.product.property_source_order=vendor,odm,product,system_ext,system
 
 # A/B OTA: update_engine copies these from the running slot when a payload omits them
 ro.vendor.build.ab_ota_partitions=boot,system,vendor
+
+# Repo-owned device files are on system (build-system.sh stage xp8)
+ro.vendor.xp8.layout=2

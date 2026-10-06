@@ -1,4 +1,6 @@
-service xp8-gsi /vendor/bin/xp8-gsi.sh
+# Installed as /system/etc/init/xp8-gsi.rc so that A/B OTAs update it. Each trigger
+# needs ro.vendor.xp8.layout=2: an older vendor.img still carries its own copy.
+service xp8-gsi /system/bin/xp8-gsi.sh
     class late_start
     user root
     group root
@@ -6,13 +8,13 @@ service xp8-gsi /vendor/bin/xp8-gsi.sh
     oneshot
     seclabel u:r:su:s0
 
-on property:sys.boot_completed=1
+on property:sys.boot_completed=1 && property:ro.vendor.xp8.layout=2
     start xp8-gsi
     start vendor.xp8-keys
 
 # Side keys (PTT, SOS, camera) as on stock: Sonim's SPCCService, which handled them, is a
 # system app the GSI cannot install. Restarted by init if it exits.
-service vendor.xp8-keys /vendor/bin/xp8-keys.sh
+service vendor.xp8-keys /system/bin/xp8-keys.sh
     class late_start
     user root
     group root input audio
@@ -20,21 +22,19 @@ service vendor.xp8-keys /vendor/bin/xp8-keys.sh
     seclabel u:r:su:s0
 
 # TrebleDroid rw-system.sh (post-fs) masks libpdx_default_transport.so; the stock OMX HAL needs it.
-on late-fs
+on late-fs && property:ro.vendor.xp8.layout=2
     umount /vendor/lib/libpdx_default_transport.so
     umount /vendor/lib64/libpdx_default_transport.so
     # It also sets 25 media volume steps; stock has Android's 15 (default index 15/3 = 5).
     exec u:r:phhsu_daemon:s0 root -- /system/bin/resetprop_phh ro.config.media_vol_steps 15
     exec u:r:phhsu_daemon:s0 root -- /system/bin/resetprop_phh ro.config.media_vol_default 5
 
-# GSI Messaging lacks RECEIVE_WAP_PUSH/READ_CELL_BROADCASTS; A16 then rejects it as default SMS app.
-on post-fs
-    mount none /vendor/etc/xp8/messaging /system/product/app/messaging bind
-    # AOSP Provision is a second SETUP_WIZARD activity; with two, PM grants nothing to Google SetupWizard.
-    mount none /vendor/etc/xp8/empty /system/system_ext/priv-app/Provision bind
+# Applies /system/etc/xp8/vendor-patches to the stock vendor files before the HALs start.
+on post-fs && property:ro.vendor.xp8.layout=2
+    exec u:r:su:s0 root root -- /system/bin/xp8-vendor-patch.sh
 
 # Magisk su is the only root path (xp8-gsi.sh swaps it into /system/xbin).
-on property:init.svc.sudaemon=running
+on property:init.svc.sudaemon=running && property:ro.vendor.xp8.layout=2
     stop sudaemon
 
 # Android 16 has no HIDL vibrator support; AIDL shim over timed_output.
@@ -45,5 +45,5 @@ service vendor.xp8-vibrator /vendor/etc/xp8/xp8-vibrator
     seclabel u:r:hal_vibrator_default:s0
 
 # update_verifier reboots unless verity is enforcing; this reboot reason makes the ABL leave EIO mode.
-on post-fs && property:ro.boot.veritymode=logging
+on post-fs && property:ro.boot.veritymode=logging && property:ro.vendor.xp8.layout=2
     setprop sys.powerctl "reboot,dm-verity enforcing"
