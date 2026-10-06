@@ -71,7 +71,7 @@ repository builds (TrebleDroid `ci-20250617`, MindTheGapps 16, stock kernel
 | Location | Compass | ✅ | |
 | Hardware | Fingerprint enrol and unlock | ✅ | Sensor in the Home button |
 | Hardware | Speaker: ringtone, calls, media | ✅ | |
-| Hardware | Microphone in push-to-talk apps (Zello) | ✅ | Handset mic level lowered 8 dB so speech at PTT distance is not limited; see [technical.md](docs/technical.md#vendor-image) |
+| Hardware | Microphone in push-to-talk apps (Zello) | ✅ | Stock mic gain, as on Sonim Android 10 |
 | Hardware | Vibration | ✅ | |
 | Hardware | Back, Home and Recents keys | ✅ | No on-screen navigation bar |
 | Hardware | PTT, SOS and camera keys | ✅ | Set up in the XP8 Buttons app: PTT and SOS go to push-to-talk apps as on stock (hold to talk, also in the background; tested with Zello), or each key runs a short- and a long-press action. See [technical.md](docs/technical.md#vendor-image) |
