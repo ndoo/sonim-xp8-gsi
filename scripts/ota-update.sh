@@ -33,7 +33,7 @@ done
 require_serial
 need_tools adb curl
 mkdir -p "$WORK"
-if [ -f "$JSON" ]; then cp "$JSON" "$WORK/ota.json"
+if [ -f "$JSON" ]; then [ "$JSON" -ef "$WORK/ota.json" ] || cp "$JSON" "$WORK/ota.json"
 else curl -fsSL -o "$WORK/ota.json" "$JSON" || die "cannot fetch $JSON"; fi
 { read -r TAG; read -r URL; read -r SIZE; read -r SUM; read -r LAYOUT; } < <(py3 - "$WORK/ota.json" "$WORK/headers" <<'PY'
 import json, sys
