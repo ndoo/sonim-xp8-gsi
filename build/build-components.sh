@@ -60,6 +60,7 @@ mapfile -t java < <(find "$SRC/keys/app/src" -name '*.java' | sort)
 javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$K/app" "${java[@]}"
 mapfile -t classes < <(find "$K/app" -name '*.class' | sort)
 "${D8[@]}" --release --min-api 29 --lib "$ANDROID_JAR" --output "$K" "${classes[@]}"
+touch -d "@${SOURCE_DATE_EPOCH:-1750118400}" "$K/classes.dex"
 (cd "$K" && zip -q -X u.apk classes.dex)
 "$ZIPALIGN" -f -p 4 "$K/u.apk" "$K/a.apk"
 sign_apk testkey "$K/a.apk" "$C/XP8Buttons.apk"
