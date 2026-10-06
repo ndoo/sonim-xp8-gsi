@@ -90,9 +90,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          d=${TAG#a16-}
-          title="Android 16 GSI for Sonim XP8 (XP8800), ${d:0:4}-${d:4:2}-${d:6:2}"
-          [[ $d != *.* ]] || title+=" (update ${d#*.})"
           gh release create "$TAG" out/release/* \
-            --title "$title" \
+            --title "$TAG" \
             --notes-file <(printf 'Built from %s.\n\nInputs: see build/inputs.lock at this tag.\n' "$GITHUB_SHA")

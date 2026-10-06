@@ -95,14 +95,24 @@ Sonim XP8. It is public.
 - Push an annotated tag `a16-YYYYMMDD` (or `a16-YYYYMMDD.N`) to run
   `.github/workflows/release.yml`. A `workflow_dispatch` run builds the
   artifacts without publishing.
+- Name the release after its tag (`a16-YYYYMMDD` or `a16-YYYYMMDD.N`); the
+  workflow does this. GitHub's release list truncates longer titles. The
+  `[GSI][16] ...` title line belongs at the top of the notes body.
 - Release notes use the same layout and headings in every release: title,
-  disclaimer, about, features, working, known issues, requirements,
-  installation, updating, downloads, changelog, credits, sources, info block.
+  disclaimer, about, needs testing (only while testers are wanted), features,
+  working, known issues, requirements, installation, updating, downloads,
+  changelog, credits, sources, info block.
   Installation and update steps are specific to the release; derive the update
   steps from what changed since the previous tag (docs only,
   `flash.sh --only system`, PC update with reassembly, or OTA). Append GitHub's
   generated notes (`gh api -X POST repos/ndoo/sonim-xp8-gsi/releases/generate-notes`)
   verbatim, then the "Built from <sha>." and "Inputs: ..." lines.
+- Put the "Needs testing" section directly after "About", never between
+  installation and updating. Make it a numbered list built from the PRs since
+  the previous tag: item 1 is the change most likely to regress or the least
+  tested, then descending risk, with checks that no PR touches (cellular data,
+  still-untested features) last. End each item with the PR numbers it covers,
+  e.g. "(#16)". Say what testers should report (firmware, SIM state, result).
 - Draft the notes and get approval before `gh release edit`.
 - Builds are reproducible. To compare two builds, compare the raw
   `system.img` hash in the release's `SHA256SUMS`; do not download the
