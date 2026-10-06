@@ -23,6 +23,9 @@ service vendor.xp8-keys /vendor/bin/xp8-keys.sh
 on late-fs
     umount /vendor/lib/libpdx_default_transport.so
     umount /vendor/lib64/libpdx_default_transport.so
+    # It also sets 25 media volume steps; stock has Android's 15 (default index 15/3 = 5).
+    exec u:r:phhsu_daemon:s0 root -- /system/bin/resetprop_phh ro.config.media_vol_steps 15
+    exec u:r:phhsu_daemon:s0 root -- /system/bin/resetprop_phh ro.config.media_vol_default 5
 
 # GSI Messaging lacks RECEIVE_WAP_PUSH/READ_CELL_BROADCASTS; A16 then rejects it as default SMS app.
 on post-fs
