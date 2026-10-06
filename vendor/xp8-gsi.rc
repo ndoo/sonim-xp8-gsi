@@ -25,6 +25,9 @@ service vendor.xp8-keys /system/bin/xp8-keys.sh
 on late-fs && property:ro.vendor.xp8.layout=2
     umount /vendor/lib/libpdx_default_transport.so
     umount /vendor/lib64/libpdx_default_transport.so
+    # It also sets 25 media volume steps; stock has Android's 15 (default index 15/3 = 5).
+    exec u:r:phhsu_daemon:s0 root -- /system/bin/resetprop_phh ro.config.media_vol_steps 15
+    exec u:r:phhsu_daemon:s0 root -- /system/bin/resetprop_phh ro.config.media_vol_default 5
 
 # Applies /system/etc/xp8/vendor-patches to the stock vendor files before the HALs start.
 on post-fs && property:ro.vendor.xp8.layout=2
