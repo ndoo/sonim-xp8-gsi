@@ -235,7 +235,8 @@ for every partition in `ro.vendor.build.ab_ota_partitions`
 | Step | What runs |
 |---|---|
 | Prepare slot b once | `enable-ab.sh` over fastboot: userdebug ABL to `abl_b` (XBL loads the ABL of the active slot; the stock ABL has no `flash` or `set_active`), `mdtpsecapp_a` and `modem_a` to `_b` |
-| Install | `ota-update.sh`: `update_engine` writes `system` to the other slot, copies `boot` and `vendor`, and makes that slot active through the boot control HAL (`bootctrl.sdm660`) |
+| Check and install | Settings → System update opens `XP8Updater` (`/system/system_ext/priv-app`, platform-signed, intent-filter priority 100 so it comes before Play services' `SystemUpdateActivity`). It reads `releases/latest/download/ota.json`, compares its `tag` with `ro.xp8.release` (set by `build-system.sh` from `XP8_RELEASE`) and `min_vendor_layout` with `ro.vendor.xp8.layout`, and calls `UpdateEngine.applyPayload` with the payload URL, so `update_engine` streams it from GitHub. `ota-update.sh` does the same from a computer over adb |
+| Install | `update_engine` writes `system` to the other slot, copies `boot` and `vendor`, and makes that slot active through the boot control HAL (`bootctrl.sdm660`) |
 | First boot | The ABL boots the new slot with retry count 7; `update_verifier` and `boot_control` mark it successful once Android has booted |
 | Fallback | A slot that is not marked successful after 7 boots is marked unbootable, and the ABL switches back to the previous slot |
 

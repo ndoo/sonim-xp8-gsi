@@ -32,3 +32,9 @@ path = ["vendor/vibrator/*.xml"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Andrew Yong"
 SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["vendor/updater/res/drawable/ic_system_update.xml"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Google LLC"
+SPDX-License-Identifier = "Apache-2.0"
