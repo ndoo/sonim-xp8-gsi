@@ -28,6 +28,8 @@ Sonim XP8. It is public.
 - Write the PR title as the squash subject: imperative, near 50 characters.
 - `main` requires a PR whose CI jobs `lint` and `components` pass on an
   up-to-date branch. Only squash merges are allowed.
+- When you squash-merge, keep GitHub's default commit title and message:
+  `gh pr merge N --squash` without `--subject` or `--body`.
 - Before pushing, run `reuse lint` (add a `REUSE.toml` annotation for each
   new file) and `git ls-files '*.sh' | xargs shellcheck -x -P SCRIPTDIR`.
 
@@ -114,9 +116,11 @@ Sonim XP8. It is public.
 - Put the "Needs testing" section directly after "About", never between
   installation and updating. Make it a numbered list built from the PRs since
   the previous tag: item 1 is the change most likely to regress or the least
-  tested, then descending risk, with checks that no PR touches (cellular data,
-  still-untested features) last. End each item with the PR numbers it covers,
-  e.g. "(#16)". Say what testers should report (firmware, SIM state, result).
+  tested, then descending risk, with cellular data and features not yet tested
+  on any phone last. List a working feature (VoLTE calls, SMS, ...) only when
+  a change since the previous tag can affect it. End each item with the PR
+  numbers it covers, e.g. "(#16)". Say what testers should report (firmware,
+  SIM state, result).
 - Draft the notes and get approval before `gh release edit`.
 - Builds are reproducible. To compare two builds, compare the raw
   `system.img` hash in the release's `SHA256SUMS`; do not download the
