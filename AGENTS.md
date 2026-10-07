@@ -99,9 +99,13 @@ Sonim XP8. It is public.
   workflow does this. GitHub's release list truncates longer titles. The
   `[GSI][16] ...` title line belongs at the top of the notes body.
 - Release notes use the same layout and headings in every release: title,
-  disclaimer, about, needs testing (only while testers are wanted), features,
-  working, known issues, requirements, installation, updating, downloads,
-  changelog, credits, sources, info block.
+  disclaimer, changes, about, needs testing (only while testers are wanted),
+  features, working, known issues, requirements, installation, updating,
+  downloads, credits, sources, info block.
+- Name the section "Changes", not "Changelog", and put it directly after the
+  disclaimer. List only what changed since the previous release: the release's
+  own entry, not the entries of earlier releases. GitHub's generated
+  "What's Changed" at the end stays as generated.
   Installation and update steps are specific to the release; derive the update
   steps from what changed since the previous tag (docs only,
   `flash.sh --only system`, PC update with reassembly, or OTA). Append GitHub's
