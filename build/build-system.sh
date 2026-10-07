@@ -5,12 +5,13 @@
 # Build out/system.img: TrebleDroid vanilla-old + MindTheGapps (replacing AOSP
 # QuickSearchBox) + Play services force-queryable overlay + tethering apex fix +
 # ImsCafXp8 + Launcher3 (Taskbar, no fixed first-screen search bar) and
-# AuthService patches + patched Messaging, without AOSP Provision + the XP8
-# overlays, side keys, System update app and boot scripts from out/components;
+# AuthService patches + lmkd zoneinfo patch + patched Messaging, without AOSP
+# Provision + the XP8 overlays, side keys, System update app and boot scripts
+# from out/components;
 # XP8_RELEASE (the release tag, default dev) becomes ro.xp8.release.
 #
 # usage: build/build-system.sh [STAGE...]
-#   stages: base gapps gmsquery apexfix ims launcher3 services messaging xp8 otacerts final
+#   stages: base gapps gmsquery apexfix ims launcher3 services lmkd messaging xp8 otacerts final
 #   (default: all, in that order; a partial run works on work/system/system.img)
 # Needs: build/fetch.sh td/ mtg/ ims/ sdk/ tools/ keys/, then build/build-components.sh
 set -euo pipefail
@@ -354,6 +355,21 @@ stage_services() {
     rm -rf "$s"
 }
 
+stage_lmkd() {
+    log "lmkd: parse the 4.4 kernel's /proc/zoneinfo"
+    local l=$W/lmkd
+    rm -rf "$l" && mkdir -p "$l"
+    dump /system/bin/lmkd "$l/lmkd"
+    python3 "$ROOT/build/lib/bytepatch.py" "$PATCHES/lmkd/lmkd.bpatch" "$l/lmkd" "$l/lmkd.new"
+    q_begin
+    q "rm /system/bin/lmkd"
+    q_put "$l/lmkd.new" /system/bin/lmkd u:object_r:lmkd_exec:s0
+    q_meta /system/bin/lmkd 0100755 u:object_r:lmkd_exec:s0
+    q "sif /system/bin/lmkd gid 2000"
+    q_commit
+    rm -rf "$l"
+}
+
 stage_messaging() {
     log "messaging: add RECEIVE_WAP_PUSH/READ_CELL_BROADCASTS"
     local m=$W/messaging d=/system/product/app/messaging
@@ -433,7 +449,7 @@ stage_final() {
     (cd "$OUT" && sha256sum system.img)
 }
 
-all=(base gapps gmsquery apexfix ims launcher3 services messaging xp8 otacerts final)
+all=(base gapps gmsquery apexfix ims launcher3 services lmkd messaging xp8 otacerts final)
 stages=("$@")
 [ ${#stages[@]} -gt 0 ] || stages=("${all[@]}")
 for s in "${stages[@]}"; do

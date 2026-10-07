@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Andrew Yong
+# SPDX-License-Identifier: MIT
+#
+# Byte patch for TrebleDroid's /system/bin/lmkd, applied by build/lib/bytepatch.py.
+# zoneinfo_parse starts a node only at a "  per-node stats" line (kernel 4.8+);
+# on the 4.4 kernel the line after the first "Node N, zone" header is
+# "  pages free", so every parse fails and lmkd kills nothing. The marker's
+# length is taken with strlen at run time, so a shorter string matches.
+sha256-in	fb515b8b2829a422747bc11683380efe34a1e5a4bc4a3b49dd8e3ca604ffb4eb
+sha256-out	7c1054df4891b3a8cfd6e82dc7efe0f872531dca6f111c2a507331768e5015d7
+# offset	original	patched	(NODE_STATS_MARKER)
+0x347b	20207065722d6e6f6465207374617473	20207061676573206672656500000000	"  per-node stats" -> "  pages free"
