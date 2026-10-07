@@ -176,7 +176,7 @@ stage_gmsquery() {
 }
 
 stage_apexfix() {
-    log "apexfix: null-check sLocalNetBlockedUidMap in the tethering apex"
+    log "apexfix: null-check sLocalNetBlockedUidMap and mCookieTagMap in the tethering apex"
     local a=$W/apex t payload bc salt
     rm -rf "$a" && mkdir -p "$a"
     dump /system/apex/com.android.tethering.capex "$a/teth.capex"
@@ -189,6 +189,7 @@ stage_apexfix() {
     [ "$(find "$a/dex" -name 'classes*.dex' | wc -l)" -eq 1 ]
     "${BAKSMALI[@]}" d "$a/dex/classes.dex" -o "$a/smali"
     patch -s -p1 -d "$a" < "$PATCHES/apexfix/bpfnetmaps.smali.diff"
+    patch -s -p1 -d "$a" < "$PATCHES/apexfix/networkstats.smali.diff"
     "${SMALI[@]}" a "$a/smali" -o "$a/classes.dex" --api 36 -j 1
     repack_dex "$a/sc.jar" "$a/classes.dex" "$a/sc.new.jar"
 

@@ -1,0 +1,16 @@
+--- a/smali/android/net/connectivity/com/android/server/net/NetworkStatsService.smali
++++ b/smali/android/net/connectivity/com/android/server/net/NetworkStatsService.smali
+@@ -1357,6 +1357,13 @@
+ 
+     iput-object p1, p0, Landroid/net/connectivity/com/android/server/net/NetworkStatsService;->mSkDestroyListener:Landroid/net/connectivity/com/android/net/module/util/SkDestroyListener;
+ 
++    iget-object p2, p0, Landroid/net/connectivity/com/android/server/net/NetworkStatsService;->mCookieTagMap:Landroid/net/connectivity/com/android/net/module/util/IBpfMap;
++
++    if-nez p2, :xp8_skdestroy_start
++
++    return-void
++
++    :xp8_skdestroy_start
+     .line 744
+     iget-object p0, p0, Landroid/net/connectivity/com/android/server/net/NetworkStatsService;->mHandler:Landroid/os/Handler;
+ 
