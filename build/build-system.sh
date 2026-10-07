@@ -417,6 +417,13 @@ stage_xp8() {
     printf '\n# XP8 GSI release\nro.xp8.release=%s\n' "${XP8_RELEASE:-dev}" >> "$W/build.prop"
     q "rm /system/build.prop"
     q_put "$W/build.prop" /system/build.prop "$SYS"
+    # Product build.prop loads after vendor's, so its roaming default wins.
+    dump /system/product/etc/build.prop "$W/product.prop"
+    grep -qx 'ro.com.android.dataroaming=true' "$W/product.prop" || {
+        echo "product build.prop: no ro.com.android.dataroaming=true" >&2; exit 1; }
+    sed -i 's/^ro\.com\.android\.dataroaming=true$/ro.com.android.dataroaming=false/' "$W/product.prop"
+    q "rm /system/product/etc/build.prop"
+    q_put "$W/product.prop" /system/product/etc/build.prop "$SYS"
     q_put "$c/xp8-keys.dex" /system/etc/xp8/xp8-keys.dex "$SYS"
     q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
     for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh; do

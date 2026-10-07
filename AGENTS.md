@@ -87,6 +87,10 @@ Sonim XP8. It is public.
 - When the next step needs fastboot, EDL or power-off, ask the user to put the
   phone in that mode. Do not reset it into an unknown state (for example
   `edl reset` into a boot loop) and leave it.
+- Never enable data roaming: not in Settings, with `settings put` or
+  `cmd phone`, in carrier config or as a build default. If a test needs
+  mobile data while roaming, ask the user to turn roaming on, and to turn it
+  off again afterwards.
 - Back up partitions before any write. Store backups compressed with `zstd`
   and checksum the raw images. Never commit a backup or its contents.
 - Follow the hard rules in [docs/agents.md](docs/agents.md) for every EDL and

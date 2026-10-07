@@ -40,6 +40,9 @@ the repository root.
    the user to disconnect the others.
 7. Never copy, upload, print or commit the backup's contents.
 8. Use Route A unless the user asks to build everything.
+9. Never turn on data roaming, in Settings or with `settings put` or
+   `cmd phone`. If a check needs mobile data while roaming, ask the user to
+   turn roaming on, and to turn it off again afterwards.
 
 ## Runbook
 
