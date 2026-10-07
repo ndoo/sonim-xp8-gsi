@@ -103,6 +103,7 @@ order; `build/build-system.sh STAGE...` reruns single stages on
 | `ims` | Adds the patched IMS app as `ImsCafXp8` ([system/ims/](../system/ims/)) |
 | `launcher3` | Patches Launcher3 ([system/launcher3/](../system/launcher3/)) |
 | `services` | Patches `AuthService` in `services.jar` ([system/services/](../system/services/)) |
+| `lmkd` | Byte-patches `/system/bin/lmkd` ([system/lmkd/](../system/lmkd/)) |
 | `messaging` | Replaces the Messaging APK with one that has two more permissions ([system/messaging/](../system/messaging/)) |
 | `xp8` | Removes AOSP Provision; adds the overlays, `XP8Buttons.apk`, the System update app `XP8Updater.apk` and `xp8-keys.dex` from `out/components/`, `xp8-gsi.rc`, the boot scripts and the [vendor/audio/](../vendor/audio/) diffs; sets `ro.xp8.release` from `XP8_RELEASE` (default `dev`) |
 | `final` | Checks the filesystem and moves the image to `out/system.img` |
