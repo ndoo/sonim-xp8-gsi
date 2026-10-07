@@ -71,7 +71,7 @@ U=$W/updater && mkdir -p "$U/stubs" "$U/app" "$U/gen"
 javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$U/stubs" "$SRC"/updater/stubs/android/os/*.java
 "$AAPT2" compile --dir "$SRC/updater/res" -o "$U/res.zip"
 "$AAPT2" link -o "$U/u.apk" --manifest "$SRC/updater/AndroidManifest.xml" -I "$ANDROID_JAR" \
-    --java "$U/gen" --min-sdk-version 29 --target-sdk-version 34 --version-code 1 --version-name 1.0 "$U/res.zip"
+    --java "$U/gen" --min-sdk-version 29 --target-sdk-version 34 --version-code 2 --version-name 1.1 "$U/res.zip"
 mapfile -t java < <(find "$SRC/updater/src" "$U/gen" -name '*.java' | sort)
 javac --release 11 -Xlint:-options -cp "$ANDROID_JAR:$U/stubs" -d "$U/app" "${java[@]}"
 mapfile -t classes < <(find "$U/app" -name '*.class' | sort)

@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemProperties;
 import android.os.UpdateEngine;
 import android.os.UpdateEngine.UpdateStatusConstants;
 import android.os.UpdateEngineCallback;
@@ -32,13 +33,11 @@ import android.widget.TextView;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Properties;
 
 /**
  * Settings > System > System update, laid out like the Pixel screen. Checks the latest
@@ -184,12 +183,13 @@ public class MainActivity extends Activity {
         String tag = j.optString("tag");
         JSONObject p = j.optJSONObject("payload");
         int need = j.optInt("min_vendor_layout", 1);
-        int layout = parseInt(prop("/vendor/build.prop", "ro.vendor.xp8.layout"), 1);
+        int layout = parseInt(SystemProperties.get("ro.vendor.xp8.layout", ""), 1);
         if (tag.equals(release())) {
             show("Your system is up to date", details(), -1, "Check for update", v -> check());
         } else if (layout < need) {
             show("Update needs a computer", details() + "\n\n" + tag
-                    + " needs a newer vendor image. Update from a computer once (install guide, "
+                    + " needs vendor layout " + need + ", this phone has " + layout
+                    + ". Update from a computer once (install guide, "
                     + "\"Update to a newer release\"); later updates install here again.",
                     -1, "Check for update", v -> check());
         } else {
@@ -235,7 +235,7 @@ public class MainActivity extends Activity {
                                 : DateUtils.getRelativeTimeSpanString(checked)));
     }
 
-    static String release() { return prop("/system/build.prop", "ro.xp8.release"); }
+    static String release() { return SystemProperties.get("ro.xp8.release", ""); }
 
     static String fetch(String url) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
@@ -249,12 +249,6 @@ public class MainActivity extends Activity {
         } finally {
             c.disconnect();
         }
-    }
-
-    static String prop(String file, String key) {
-        Properties p = new Properties();
-        try (FileInputStream in = new FileInputStream(file)) { p.load(in); } catch (Exception e) { }
-        return p.getProperty(key, "");
     }
 
     static int parseInt(String s, int d) {
