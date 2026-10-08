@@ -441,6 +441,10 @@ stage_xp8() {
     q_put "$W/rw-system.sh" /system/bin/rw-system.sh u:object_r:phhsu_exec:s0
     q_meta /system/bin/rw-system.sh 0100755 u:object_r:phhsu_exec:s0
     q "sif /system/bin/rw-system.sh gid 2000"
+    dump /system/etc/ueventd.rc "$W/ueventd.rc"
+    printf '\nparallel_restorecon enabled\n' >> "$W/ueventd.rc"
+    q "rm /system/etc/ueventd.rc"
+    q_put "$W/ueventd.rc" /system/etc/ueventd.rc "$SYS"
     q_put "$c/xp8-keys.dex" /system/etc/xp8/xp8-keys.dex "$SYS"
     q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
     for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh; do
