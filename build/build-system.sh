@@ -474,6 +474,15 @@ stage_otacerts() {
 stage_final() {
     log "final: fsck and out/system.img"
     e2fsck -fn "$IMG" >/dev/null 2>&1
+    # assemble.sh precompiles the vendor's SELinux policy against these.
+    local s=$OUT/components/sepolicy p
+    rm -rf "$s"
+    for p in system:/system system_ext:/system/system_ext product:/system/product; do
+        mkdir -p "$s/${p%%:*}"
+        debugfs -R "rdump ${p#*:}/etc/selinux $s/${p%%:*}" "$IMG" 2>/dev/null
+    done
+    [ -s "$s/system/selinux/plat_sepolicy_and_mapping.sha256" ] \
+        || { echo "no SELinux policy in $IMG" >&2; exit 1; }
     mv "$IMG" "$OUT/system.img"
     (cd "$OUT" && sha256sum system.img)
 }

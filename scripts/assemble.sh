@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 #
 # Build boot.img and vendor.img from your own stock backup and the release components.
-# Compiles nothing. The results contain your phone's proprietary files: do not share them.
+# Compiles only the SELinux policy. The results contain your phone's proprietary files: do not share them.
 #
 # usage: scripts/assemble.sh [options] STOCK_DIR
 #   STOCK_DIR          your EDL backup: boot_a.bin[.zst] and system_a.bin[.zst] (read only)

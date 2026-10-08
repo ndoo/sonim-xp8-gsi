@@ -106,7 +106,7 @@ order; `build/build-system.sh STAGE...` reruns single stages on
 | `lmkd` | Byte-patches `/system/bin/lmkd` ([system/lmkd/](../system/lmkd/)) |
 | `messaging` | Replaces the Messaging APK with one that has two more permissions ([system/messaging/](../system/messaging/)) |
 | `xp8` | Removes AOSP Provision; adds the overlays, `XP8Buttons.apk`, the System update app `XP8Updater.apk` and `xp8-keys.dex` from `out/components/`, `xp8-gsi.rc`, the boot scripts and the [vendor/audio/](../vendor/audio/) diffs; sets `ro.xp8.release` from `XP8_RELEASE` (default `dev`) and `ro.sf.lcd_density`; removes TrebleDroid's density trigger from `vndk.rc` and the `/sys` search from its `rw-system.sh`; turns on `parallel_restorecon` in `ueventd.rc` |
-| `final` | Checks the filesystem and moves the image to `out/system.img` |
+| `final` | Checks the filesystem, copies the SELinux policy files to `out/components/sepolicy/` and moves the image to `out/system.img` |
 
 The reason for each change is in
 [technical.md](technical.md#system-image-changes).
@@ -122,7 +122,9 @@ scripts/assemble.sh --docker "$BACKUP"
 `assemble.sh` reads `out/components/` by default. `--docker` builds the
 `xp8-gsi-build` image if it is missing and runs inside it; on Linux with the
 Dockerfile's tools installed it can be left out. On macOS, `--docker` is
-required.
+required. An `xp8-gsi-build` image built before `secilc` was added to the
+Dockerfile gives a vendor image without a precompiled SELinux policy; remove
+the image (`docker image rm xp8-gsi-build`) to rebuild it.
 
 ## Package a release
 
