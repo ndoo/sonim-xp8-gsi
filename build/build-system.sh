@@ -432,6 +432,15 @@ stage_xp8() {
     sed -i '/^on property:ro\.sf\.lcd_density=\*$/,/^$/d' "$W/vndk.rc"
     q "rm /system/etc/init/vndk.rc"
     q_put "$W/vndk.rc" /system/etc/init/vndk.rc "$SYS"
+    # rw-system.sh walks all of /sys for a Focaltech node; the XP8 panel is Cypress.
+    dump /system/bin/rw-system.sh "$W/rw-system.sh"
+    grep -q 'in .(find /sys -name fts_gesture_mode);do' "$W/rw-system.sh" \
+        || { echo "rw-system.sh: no fts_gesture_mode loop to remove" >&2; exit 1; }
+    sed -i 's|in .(find /sys -name fts_gesture_mode);do|in ;do|' "$W/rw-system.sh"
+    q "rm /system/bin/rw-system.sh"
+    q_put "$W/rw-system.sh" /system/bin/rw-system.sh u:object_r:phhsu_exec:s0
+    q_meta /system/bin/rw-system.sh 0100755 u:object_r:phhsu_exec:s0
+    q "sif /system/bin/rw-system.sh gid 2000"
     q_put "$c/xp8-keys.dex" /system/etc/xp8/xp8-keys.dex "$SYS"
     q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
     for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh; do
