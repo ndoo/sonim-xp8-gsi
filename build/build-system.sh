@@ -8,13 +8,17 @@
 # AuthService patches + lmkd zoneinfo patch + patched Messaging, without AOSP
 # Provision + the XP8 overlays, side keys, System update app and boot scripts
 # from out/components;
-# XP8_RELEASE (the release tag, default dev) becomes ro.xp8.release.
+# XP8_RELEASE (the release tag, default dev) becomes ro.xp8.release and the
+# suffix of ro.build.version.incremental.
 #
 # usage: build/build-system.sh [STAGE...]
 #   stages: base gapps gmsquery apexfix ims launcher3 services lmkd messaging xp8 otacerts final
 #   (default: all, in that order; a partial run works on work/system/system.img)
 # Needs: build/fetch.sh td/ mtg/ ims/ sdk/ tools/ keys/, then build/build-components.sh
 set -euo pipefail
+
+REL=${XP8_RELEASE:-dev}
+[[ $REL =~ ^[A-Za-z0-9._-]+$ ]] || { echo "XP8_RELEASE '$REL': use letters, digits, '.', '_' and '-'" >&2; exit 1; }
 
 # shellcheck source-path=SCRIPTDIR source=lib/tools.sh
 . "$(dirname "$0")/lib/tools.sh"
@@ -416,7 +420,11 @@ stage_xp8() {
         /system/system_ext/etc/default-permissions/default-permissions-xp8updater.xml "$SYS"
     # XP8Updater compares ro.xp8.release with the tag in the latest ota.json.
     dump /system/build.prop "$W/build.prop"
-    printf '\n# XP8 GSI release\nro.xp8.release=%s\n' "${XP8_RELEASE:-dev}" >> "$W/build.prop"
+    printf '\n# XP8 GSI release\nro.xp8.release=%s\n' "$REL" >> "$W/build.prop"
+    # A new incremental makes PackageManager reparse system APKs and rerun default grants.
+    grep -q '^ro\.build\.version\.incremental=' "$W/build.prop" || {
+        echo "system build.prop: no ro.build.version.incremental" >&2; exit 1; }
+    sed -i "s/^\(ro\.build\.version\.incremental=.*\)$/\1.$REL/" "$W/build.prop"
     # The vendor sets the density after zygote starts, which made vndk.rc restart zygote.
     printf '\n# XP8 panel density\nro.sf.lcd_density=480\n' >> "$W/build.prop"
     q "rm /system/build.prop"
