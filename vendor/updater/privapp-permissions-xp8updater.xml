@@ -4,5 +4,7 @@
 <permissions>
     <privapp-permissions package="sg.ndoo.xp8.updater">
         <permission name="android.permission.REBOOT" />
+        <permission name="android.permission.START_ACTIVITIES_FROM_BACKGROUND" />
+        <permission name="android.permission.WRITE_SECURE_SETTINGS" />
     </privapp-permissions>
 </permissions>

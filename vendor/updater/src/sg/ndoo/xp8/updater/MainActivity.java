@@ -3,12 +3,21 @@
 
 package sg.ndoo.xp8.updater;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.job.JobScheduler;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.TypedArray;
 import android.graphics.drawable.GradientDrawable;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -18,6 +27,7 @@ import android.os.SystemProperties;
 import android.os.UpdateEngine;
 import android.os.UpdateEngine.UpdateStatusConstants;
 import android.os.UpdateEngineCallback;
+import android.provider.Settings;
 import android.text.format.DateUtils;
 import android.text.format.Formatter;
 import android.util.TypedValue;
@@ -28,6 +38,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import org.json.JSONObject;
@@ -60,8 +71,11 @@ public class MainActivity extends Activity {
     ProgressBar bar;
     Button primary;
     Button notes;
+    Switch automatic;
     JSONObject ota;
     int engineStatus = UpdateStatusConstants.IDLE;
+    float enginePercent;
+    boolean serviceStarted;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -87,15 +101,19 @@ public class MainActivity extends Activity {
         content.addView(bar);
         progressText = text(14, attrColor(android.R.attr.textColorSecondary));
         content.addView(progressText);
+        automatic = new Switch(this);
+        automatic.setText("Download updates automatically on Wi-Fi");
+        automatic.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        automatic.setTextColor(attrColor(android.R.attr.textColorPrimary));
+        automatic.setPadding(0, dp(24), 0, 0);
+        automatic.setOnCheckedChangeListener((b, on) -> setAutomatic(on));
+        content.addView(automatic);
         ScrollView scroll = new ScrollView(this);
         scroll.addView(content);
 
         notes = new Button(this, null, android.R.attr.borderlessButtonStyle);
-        notes.setText("Release notes");
         notes.setAllCaps(false);
         notes.setTextColor(accent);
-        notes.setOnClickListener(v -> startActivity(new Intent(Intent.ACTION_VIEW,
-                Uri.parse(RELEASES + ota.optString("tag")))));
         primary = new Button(this, null, android.R.attr.borderlessButtonStyle);
         primary.setAllCaps(false);
         primary.setTextColor(attrColor(android.R.attr.colorBackground));
@@ -121,36 +139,87 @@ public class MainActivity extends Activity {
         setContentView(root);
 
         engine = new UpdateEngine();
-        engine.bind(new UpdateEngineCallback() {
+        UpdateEngineCallback callback = new UpdateEngineCallback() {
             @Override
             public void onStatusUpdate(int s, float percent) {
                 engineStatus = s;
+                enginePercent = percent;
                 showEngine(s, percent);
             }
 
             @Override
             public void onPayloadApplicationComplete(int error) {
-                if (error != 0) {
+                if (error == UpdateService.USER_CANCELED) {
+                    engineStatus = UpdateStatusConstants.IDLE;
+                    check();
+                } else if (error != 0) {
                     engineStatus = UpdateStatusConstants.IDLE;
                     show("Couldn't install the update", details()
                             + "\n\nupdate_engine reported error " + error + ". Nothing changes at the next restart.",
                             -1, "Try again", v -> check());
                 }
             }
-        }, ui);
+        };
         // bind() reports the current status first; check only when update_engine is idle.
-        ui.post(() -> { if (engineStatus == UpdateStatusConstants.IDLE) check(); });
+        UpdateService.ENGINE.execute(() -> {
+            engine.bind(callback, ui);
+            ui.post(() -> { if (engineStatus == UpdateStatusConstants.IDLE) check(); });
+        });
+        UpdateCheckJob.schedule(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Pause and Resume in the notification do not reach this activity's callback.
+        showEngine(engineStatus, enginePercent);
+        automatic.setChecked(UpdateCheckJob.automatic(this));
+    }
+
+    /** Shares Developer options > Automatic system updates (ota_disable_automatic_update). */
+    void setAutomatic(boolean on) {
+        if (on == UpdateCheckJob.automatic(this)) return;
+        Settings.Global.putInt(getContentResolver(), "ota_disable_automatic_update", on ? 0 : 1);
+        if (!on) {
+            getSystemService(JobScheduler.class).cancel(UpdateCheckJob.DOWNLOAD);
+        } else if (ota != null && UpdateCheckJob.installable(ota)) {
+            UpdateCheckJob.scheduleDownload(this);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        UpdateService.ENGINE.execute(engine::unbind);
+        super.onDestroy();
     }
 
     void showEngine(int s, float percent) {
         switch (s) {
+            case UpdateStatusConstants.UPDATE_AVAILABLE:
             case UpdateStatusConstants.DOWNLOADING:
-                show("Downloading and installing system update", details(), percent,
-                        "Cancel", v -> engine.cancel());
+            case UpdateStatusConstants.VERIFYING:
+            case UpdateStatusConstants.FINALIZING:
+                if (!serviceStarted) {
+                    serviceStarted = true;
+                    startForegroundService(new Intent(this, UpdateService.class));
+                }
+                break;
+            default:
+                break;
+        }
+        switch (s) {
+            case UpdateStatusConstants.DOWNLOADING:
+                if (prefs.getBoolean("paused", false)) {
+                    show("System update paused", details(), percent,
+                            "Resume", v -> pause(false), "Cancel", v -> cancel());
+                } else {
+                    show("Downloading and installing system update", details(), percent,
+                            "Pause", v -> pause(true), "Cancel", v -> cancel());
+                }
                 break;
             case UpdateStatusConstants.VERIFYING:
             case UpdateStatusConstants.FINALIZING:
-                show("Installing system update", details(), percent, "Cancel", v -> engine.cancel());
+                show("Installing system update", details(), percent, "Cancel", v -> cancel());
                 break;
             case UpdateStatusConstants.UPDATED_NEED_REBOOT:
                 show("Restart to finish installing", details()
@@ -160,6 +229,16 @@ public class MainActivity extends Activity {
             default:
                 break;
         }
+    }
+
+    void cancel() {
+        UpdateService.ENGINE.execute(engine::cancel);
+    }
+
+    void pause(boolean pause) {
+        UpdateService.pause(this, engine, pause);
+        startService(new Intent(this, UpdateService.class));
+        showEngine(engineStatus, enginePercent);
     }
 
     void check() {
@@ -183,7 +262,8 @@ public class MainActivity extends Activity {
         String tag = j.optString("tag");
         JSONObject p = j.optJSONObject("payload");
         int need = j.optInt("min_vendor_layout", 1);
-        int layout = parseInt(SystemProperties.get("ro.vendor.xp8.layout", ""), 1);
+        int layout = layout();
+        prefs.edit().putString("offered", tag).apply();
         if (tag.equals(release())) {
             show("Your system is up to date", details(), -1, "Check for update", v -> check());
         } else if (layout < need) {
@@ -194,21 +274,84 @@ public class MainActivity extends Activity {
                     -1, "Check for update", v -> check());
         } else {
             show("System update available", details() + "\n\nYour device will be updated to " + tag
-                    + ". It installs while you use the phone, and your data is kept.\n\nSize: "
+                    + ". It installs while you use the phone, and your data is kept."
+                    + (UpdateCheckJob.automatic(this) ? " On Wi-Fi it downloads automatically." : "")
+                    + "\n\nSize: "
                     + Formatter.formatFileSize(this, p.optLong("size")),
-                    -1, "Download & install", v -> install(p));
+                    -1, "Download & install", v -> confirm(p));
         }
     }
 
+    void confirm(JSONObject p) {
+        Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (battery != null && battery.getBooleanExtra(BatteryManager.EXTRA_BATTERY_LOW, false)
+                && battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) == 0) {
+            show("Battery too low", details() + "\n\nYour battery is at "
+                    + battery.getIntExtra(BatteryManager.EXTRA_LEVEL, 0) * 100
+                            / battery.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+                    + "%. Connect your charger to install the update.",
+                    -1, "Try again", v -> confirm(p));
+            return;
+        }
+        ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+        NetworkCapabilities nc = cm.getNetworkCapabilities(cm.getActiveNetwork());
+        if (nc == null || nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) {
+            install(p);
+            return;
+        }
+        boolean cellular = nc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
+        boolean roaming = cellular && !nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING);
+        new AlertDialog.Builder(this)
+                .setTitle(roaming ? "Download using roaming data?"
+                        : cellular ? "Download using mobile data?" : "Download on a metered network?")
+                .setMessage("This update is " + Formatter.formatFileSize(this, p.optLong("size")) + ". "
+                        + (roaming ? "Your carrier may charge roaming fees for the data."
+                                : cellular ? "Your carrier may charge for the data."
+                                : "This network is metered, so the data may be limited or charged.")
+                        + " To avoid this, connect to an unmetered Wi-Fi network.")
+                .setPositiveButton("Download", (d, w) -> install(p))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
     void install(JSONObject p) {
-        engine.resetStatus();
-        engine.applyPayload(p.optString("url"), 0, p.optLong("size"),
-                p.optString("headers").trim().split("\n"));
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 0);
+        }
+        apply(this, engine, p, 0, false);
+        serviceStarted = true;
         show("Downloading and installing system update", details(), 0, null, null);
     }
 
-    /** percent -1 hides the progress bar; a null button text hides the primary button. */
+    /** A non-zero network handle binds the download to that network (NETWORK_ID). */
+    static void apply(Context c, UpdateEngine e, JSONObject p, long network, boolean auto) {
+        String headers = p.optString("headers").trim();
+        if (network != 0) headers += "\nNETWORK_ID=" + network;
+        c.getSharedPreferences("updater", MODE_PRIVATE).edit()
+                .remove("paused").putBoolean("auto", auto).commit();
+        String[] h = headers.split("\n");
+        UpdateService.ENGINE.execute(() -> {
+            e.resetStatus();
+            e.applyPayload(p.optString("url"), 0, p.optLong("size"), h);
+        });
+        try {
+            c.startForegroundService(new Intent(c, UpdateService.class));
+        } catch (IllegalStateException ex) {
+            // Background start refused; the activity starts the service when opened.
+        }
+    }
+
     void show(String t, String b, float percent, String button, View.OnClickListener l) {
+        show(t, b, percent, button, l, null, null);
+    }
+
+    /**
+     * percent -1 hides the progress bar; a null button text hides the primary button; a null
+     * secondary shows Release notes when an ota.json has been read.
+     */
+    void show(String t, String b, float percent, String button, View.OnClickListener l,
+            String secondary, View.OnClickListener sl) {
         title.setText(t);
         body.setText(b);
         boolean busy = percent >= 0;
@@ -219,7 +362,14 @@ public class MainActivity extends Activity {
             bar.setProgress((int) (percent * 1000));
             progressText.setText(String.format("%.0f%%", percent * 100));
         }
-        notes.setVisibility(ota != null ? View.VISIBLE : View.GONE);
+        if (secondary == null && ota != null) {
+            secondary = "Release notes";
+            sl = v -> startActivity(new Intent(Intent.ACTION_VIEW,
+                    Uri.parse(RELEASES + ota.optString("tag"))));
+        }
+        notes.setVisibility(secondary != null ? View.VISIBLE : View.GONE);
+        notes.setText(secondary);
+        notes.setOnClickListener(sl);
         primary.setVisibility(button != null ? View.VISIBLE : View.GONE);
         primary.setText(button);
         primary.setOnClickListener(l);
@@ -236,6 +386,8 @@ public class MainActivity extends Activity {
     }
 
     static String release() { return SystemProperties.get("ro.xp8.release", ""); }
+
+    static int layout() { return parseInt(SystemProperties.get("ro.vendor.xp8.layout", ""), 1); }
 
     static String fetch(String url) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();

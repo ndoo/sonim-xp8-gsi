@@ -412,6 +412,8 @@ stage_xp8() {
     q_put "$c/XP8Updater.apk" /system/system_ext/priv-app/XP8Updater/XP8Updater.apk "$SYS"
     q_put "$ROOT/vendor/updater/privapp-permissions-xp8updater.xml" \
         /system/system_ext/etc/permissions/privapp-permissions-xp8updater.xml "$SYS"
+    q_put "$ROOT/vendor/updater/default-permissions-xp8updater.xml" \
+        /system/system_ext/etc/default-permissions/default-permissions-xp8updater.xml "$SYS"
     # XP8Updater compares ro.xp8.release with the tag in the latest ota.json.
     dump /system/build.prop "$W/build.prop"
     printf '\n# XP8 GSI release\nro.xp8.release=%s\n' "${XP8_RELEASE:-dev}" >> "$W/build.prop"

@@ -438,7 +438,16 @@ to. This needs:
 Then open **Settings → System → System update**. It checks the latest
 release and offers **Download & install**: `update_engine` streams the
 payload from GitHub into the other slot while you use the phone, and
-**Restart now** boots it. No computer or root is needed.
+**Restart now** boots it. No computer or root is needed. On mobile data
+or a metered Wi-Fi network it asks first, and with a low battery it asks
+you to connect the charger.
+A notification shows the progress, with **Pause** and **Resume**, and
+offers **Restart now** when the update is installed. The phone also checks
+once a day, notifies you when a new release is available, and downloads it
+automatically on Wi-Fi when the battery is not low. It never downloads
+automatically over mobile data. To turn automatic downloads off, turn off
+**Download updates automatically on Wi-Fi** in System update (the same
+setting as Developer options → Automatic system updates).
 
 From a computer instead, with the phone booted and USB debugging on:
 
