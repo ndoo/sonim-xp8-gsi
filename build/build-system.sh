@@ -415,6 +415,8 @@ stage_xp8() {
     # XP8Updater compares ro.xp8.release with the tag in the latest ota.json.
     dump /system/build.prop "$W/build.prop"
     printf '\n# XP8 GSI release\nro.xp8.release=%s\n' "${XP8_RELEASE:-dev}" >> "$W/build.prop"
+    # The vendor sets the density after zygote starts, which made vndk.rc restart zygote.
+    printf '\n# XP8 panel density\nro.sf.lcd_density=480\n' >> "$W/build.prop"
     q "rm /system/build.prop"
     q_put "$W/build.prop" /system/build.prop "$SYS"
     # Product build.prop loads after vendor's, so its roaming default wins.
@@ -424,6 +426,12 @@ stage_xp8() {
     sed -i 's/^ro\.com\.android\.dataroaming=true$/ro.com.android.dataroaming=false/' "$W/product.prop"
     q "rm /system/product/etc/build.prop"
     q_put "$W/product.prop" /system/product/etc/build.prop "$SYS"
+    dump /system/etc/init/vndk.rc "$W/vndk.rc"
+    grep -qx 'on property:ro.sf.lcd_density=\*' "$W/vndk.rc" \
+        || { echo "vndk.rc: no ro.sf.lcd_density trigger to remove" >&2; exit 1; }
+    sed -i '/^on property:ro\.sf\.lcd_density=\*$/,/^$/d' "$W/vndk.rc"
+    q "rm /system/etc/init/vndk.rc"
+    q_put "$W/vndk.rc" /system/etc/init/vndk.rc "$SYS"
     q_put "$c/xp8-keys.dex" /system/etc/xp8/xp8-keys.dex "$SYS"
     q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
     for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh; do
