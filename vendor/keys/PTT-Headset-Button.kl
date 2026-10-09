@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2020 The Linux Foundation
+# SPDX-FileCopyrightText: 2026 Andrew Yong
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# The stock /vendor/usr/keylayout/PTT-Headset-Button.kl with PTT as 12, the keycode
+# (228) of Sonim's KEYCODE_PTT.
+
+key 249   12
