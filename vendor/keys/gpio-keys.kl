@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2013 The Linux Foundation
+# SPDX-FileCopyrightText: 2026 Andrew Yong
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# The stock /vendor/usr/keylayout/gpio-keys.kl with PTT and SOS as 12 and 11, the
+# keycodes (228, 227) of Sonim's KEYCODE_PTT and KEYCODE_SOS. The camera key (766)
+# is left unmapped: the side-key daemon handles it.
+
+key 115   VOLUME_UP
+key 114   VOLUME_DOWN
+key 172   HOME
+key 528   FOCUS
+key 158   BACK
+key 580   APP_SWITCH
+key 148   11
+key 149   12

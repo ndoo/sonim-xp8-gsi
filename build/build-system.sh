@@ -491,6 +491,9 @@ PY
     q "rm /system/etc/ueventd.rc"
     q_put "$W/ueventd.rc" /system/etc/ueventd.rc "$SYS"
     q_put "$c/xp8-keys.dex" /system/etc/xp8/xp8-keys.dex "$SYS"
+    for f in gpio-keys PTT-Headset-Button; do
+        q_put "$ROOT/vendor/keys/$f.kl" "/system/product/usr/keylayout/$f.kl" "$SYS"
+    done
     q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
     for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh; do
         q_put "$ROOT/vendor/$f" "/system/bin/${f##*/}" "$SYS"

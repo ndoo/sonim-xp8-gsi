@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 no0406
+// SPDX-FileCopyrightText: 2026 Andrew Yong
 // SPDX-License-Identifier: MIT
 
 package sg.ndoo.xp8.buttons;
@@ -32,7 +33,7 @@ import java.util.Properties;
  *
  * Per key (ptt, sos, camera):
  *   KEY.forward  "" (off), "*" (every push-to-talk app) or a package: press and
- *                release go to that app as Sonim's PTT/SOS broadcasts
+ *                release go to that app as on stock (Sonim, Kodiak or MCPTT intents)
  *   KEY.short    action on a short press, when not forwarding
  *   KEY.long     action on a press as long as Android's touch & hold delay
  *                (Accessibility; 0.4 s by default), when not forwarding
@@ -44,7 +45,10 @@ import java.util.Properties;
 public class MainActivity extends Activity {
     static final String[] KEYS = {"ptt", "sos", "camera"};
     static final String[] TITLES = {"PTT key", "SOS key", "Camera key"};
-    static final String SONIM = "com.sonim.intent.action.";
+    static final String[] PTT_ACTIONS = {"com.sonim.intent.action.PTT_KEY_DOWN",
+        "com.kodiak.intent.action.PTT_BUTTON", "com.mcx.intent.action.CRITICAL_COMMUNICATION_CONTROL_KEY"};
+    static final String[] SOS_ACTIONS = {"com.sonim.intent.action.SOS_KEY_DOWN",
+        "com.kodiak.intent.action.KEYCODE_SOS"};
 
     final Properties config = new Properties();
     File file;
@@ -113,12 +117,17 @@ public class MainActivity extends Activity {
         }
     }
 
-    // Push-to-talk apps: packages with a receiver for the Sonim broadcast of this key.
+    // Push-to-talk apps: packages that take one of the daemon's actions for this key.
     List<String> pttApps(String key) {
-        String action = SONIM + (key.equals("sos") ? "SOS_KEY_DOWN" : "PTT_KEY_DOWN");
+        String[] actions = key.equals("sos") ? SOS_ACTIONS : PTT_ACTIONS;
         List<String> out = new ArrayList<>();
-        for (ResolveInfo r : getPackageManager().queryBroadcastReceivers(new Intent(action), 0))
-            if (!out.contains(r.activityInfo.packageName)) out.add(r.activityInfo.packageName);
+        for (String a : actions) {
+            for (ResolveInfo r : getPackageManager().queryBroadcastReceivers(new Intent(a), 0))
+                if (!out.contains(r.activityInfo.packageName)) out.add(r.activityInfo.packageName);
+            if (!key.equals("sos"))
+                for (ResolveInfo r : getPackageManager().queryIntentServices(new Intent(a), 0))
+                    if (!out.contains(r.serviceInfo.packageName)) out.add(r.serviceInfo.packageName);
+        }
         return out;
     }
 

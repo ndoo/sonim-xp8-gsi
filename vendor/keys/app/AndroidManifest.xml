@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-FileCopyrightText: 2026 no0406
+     SPDX-FileCopyrightText: 2026 Andrew Yong
      SPDX-License-Identifier: MIT
 
      XP8 Buttons: chooses what the XP8 side keys do. The side-key daemon
@@ -13,6 +14,15 @@
         </intent>
         <intent>
             <action android:name="com.sonim.intent.action.SOS_KEY_DOWN" />
+        </intent>
+        <intent>
+            <action android:name="com.kodiak.intent.action.PTT_BUTTON" />
+        </intent>
+        <intent>
+            <action android:name="com.mcx.intent.action.CRITICAL_COMMUNICATION_CONTROL_KEY" />
+        </intent>
+        <intent>
+            <action android:name="com.kodiak.intent.action.KEYCODE_SOS" />
         </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />

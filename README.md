@@ -74,7 +74,7 @@ repository builds (TrebleDroid `ci-20250617`, MindTheGapps 16, stock kernel
 | Hardware | Microphone in push-to-talk apps (Zello) | ✅ | Stock mic gain, as on Sonim Android 10 |
 | Hardware | Vibration | ✅ | |
 | Hardware | Back, Home and Recents keys | ✅ | No on-screen navigation bar |
-| Hardware | PTT, SOS and camera keys | ✅ | Set up in the XP8 Buttons app: PTT and SOS go to push-to-talk apps as on stock (hold to talk, also in the background; tested with Zello), or each key runs a short- and a long-press action. See [technical.md](docs/technical.md#vendor-image) |
+| Hardware | PTT, SOS and camera keys | ✅ | Set up in the XP8 Buttons app: PTT and SOS go to push-to-talk apps as on stock (hold to talk, also in the background; tested with Zello, where the PTT key is added once in its PTT button settings), or each key runs a short- and a long-press action. See [technical.md](docs/technical.md#vendor-image) |
 | Hardware | Camera capture, front and rear | ✅ | |
 | System | File-based encryption, `/sdcard` | ✅ | |
 | System | Google setup wizard and Play Store | ✅ | |
