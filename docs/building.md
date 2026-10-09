@@ -67,6 +67,12 @@ between builds. Signing uses the public AOSP test keys, file and filesystem
 times come from `SOURCE_DATE_EPOCH` (default `1750118400`), and the
 tethering APEX's hashtree salt is the SHA-256 of its payload.
 
+To install a build on a phone that keeps its data (`flash.sh --only system`
+or an OTA), give each build its own `XP8_RELEASE`
+(`-e XP8_RELEASE=dev-2`). Android rereads changed system apps and applies
+new default permissions only when `ro.build.version.incremental` changes,
+and the build appends `XP8_RELEASE` to it.
+
 To sign the tethering APEX with your own key, set `APEX_KEY` to an RSA-4096
 private key in PEM format, inside the container (`-e APEX_KEY=/src/my.pem`
 with the key in the checkout). The build stops if the file is not an
@@ -105,7 +111,7 @@ order; `build/build-system.sh STAGE...` reruns single stages on
 | `services` | Patches `AuthService` in `services.jar` ([system/services/](../system/services/)) |
 | `lmkd` | Byte-patches `/system/bin/lmkd` ([system/lmkd/](../system/lmkd/)) |
 | `messaging` | Replaces the Messaging APK with one that has two more permissions ([system/messaging/](../system/messaging/)) |
-| `xp8` | Removes AOSP Provision; adds the overlays, `XP8Buttons.apk`, the System update app `XP8Updater.apk` and `xp8-keys.dex` from `out/components/`, `xp8-gsi.rc`, the boot scripts and the [vendor/audio/](../vendor/audio/) diffs; sets `ro.xp8.release` from `XP8_RELEASE` (default `dev`) and `ro.sf.lcd_density`; removes TrebleDroid's density trigger from `vndk.rc` and the `/sys` search from its `rw-system.sh`; turns on `parallel_restorecon` in `ueventd.rc` |
+| `xp8` | Removes AOSP Provision; adds the overlays, `XP8Buttons.apk`, the System update app `XP8Updater.apk` and `xp8-keys.dex` from `out/components/`, `xp8-gsi.rc`, the boot scripts and the [vendor/audio/](../vendor/audio/) diffs; sets `ro.xp8.release` from `XP8_RELEASE` (default `dev`), appends `.` and `XP8_RELEASE` to `ro.build.version.incremental`, and sets `ro.sf.lcd_density`; removes TrebleDroid's density trigger from `vndk.rc` and the `/sys` search from its `rw-system.sh`; turns on `parallel_restorecon` in `ueventd.rc` |
 | `final` | Checks the filesystem, copies the SELinux policy files to `out/components/sepolicy/` and moves the image to `out/system.img` |
 
 The reason for each change is in
