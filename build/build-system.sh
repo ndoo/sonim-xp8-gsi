@@ -434,6 +434,10 @@ stage_xp8() {
     grep -qx 'ro.com.android.dataroaming=true' "$W/product.prop" || {
         echo "product build.prop: no ro.com.android.dataroaming=true" >&2; exit 1; }
     sed -i 's/^ro\.com\.android\.dataroaming=true$/ro.com.android.dataroaming=false/' "$W/product.prop"
+    # Stock's ro.lmk.debug=true reaches the vendor build.prop; it logs every lmkd pressure event.
+    ! grep -q '^ro\.lmk\.debug=' "$W/product.prop" || {
+        echo "product build.prop: already sets ro.lmk.debug" >&2; exit 1; }
+    printf '\n# XP8: no lmkd debug logging\nro.lmk.debug=false\n' >> "$W/product.prop"
     q "rm /system/product/etc/build.prop"
     q_put "$W/product.prop" /system/product/etc/build.prop "$SYS"
     dump /system/etc/init/vndk.rc "$W/vndk.rc"
