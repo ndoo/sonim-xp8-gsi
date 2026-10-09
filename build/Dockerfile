@@ -22,6 +22,7 @@ RUN apt-get update \
       patch \
       patchelf \
       python3 \
+      secilc \
       unzip \
       xz-utils \
       zip \

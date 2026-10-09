@@ -270,6 +270,51 @@ class Vendor:
                 die('%s: parent directory not created first' % path)
             self.entries[path] = e
 
+    def precompile_sepolicy(self):
+        sp = os.path.join(self.a.components, 'sepolicy')
+        secilc = shutil.which('secilc')
+        sel = 'etc/selinux/'
+        if not os.path.isdir(sp) or not secilc:
+            print('mkvendor: no %s; the phone compiles its SELinux policy at boot'
+                  % ('secilc' if secilc is None else 'components/sepolicy'))
+            return
+        # Mirrors init's secilc call; genfs label files would need init's version logic.
+        if (sel + 'genfs_labels_version.txt' in self.entries
+                or os.path.exists(os.path.join(sp, 'system/selinux/plat_sepolicy_genfs_202404.cil'))):
+            print('mkvendor: genfs labels in use; the phone compiles its SELinux policy at boot')
+            return
+        vers = open(self.need(sel + 'plat_sepolicy_vers.txt')['src']).read().strip()
+
+        def comp(*p):
+            f = os.path.join(sp, *p)
+            return [f] if os.path.isfile(f) else []
+
+        plat, mapping = comp('system/selinux/plat_sepolicy.cil'), comp('system/selinux/mapping/%s.cil' % vers)
+        if not plat or not mapping:
+            die('components/sepolicy has no plat_sepolicy.cil or mapping/%s.cil' % vers)
+        out = self.mod_path(sel + 'precompiled_sepolicy')
+        args = [secilc, plat[0], '-m', '-M', 'true', '-G', '-N', '-c', '30', mapping[0],
+                '-o', out, '-f', os.devnull]
+        args += comp('system/selinux/mapping/%s.compat.cil' % vers)
+        args += comp('system_ext/selinux/system_ext_sepolicy.cil')
+        args += comp('system_ext/selinux/mapping/%s.cil' % vers)
+        args += comp('system_ext/selinux/mapping/%s.compat.cil' % vers)
+        args += comp('product/selinux/product_sepolicy.cil')
+        args += comp('product/selinux/mapping/%s.cil' % vers)
+        args += [self.need(sel + 'plat_pub_versioned.cil')['src'], self.need(sel + 'vendor_sepolicy.cil')['src']]
+        run(args)
+        pol = self.need(sel + 'precompiled_sepolicy')
+        pol['src'] = out
+        for part, name in (('system', 'plat'), ('system_ext', 'system_ext'), ('product', 'product')):
+            rel = '%sprecompiled_sepolicy.%s_sepolicy_and_mapping.sha256' % (sel, name)
+            src = comp('%s/selinux/%s_sepolicy_and_mapping.sha256' % (part, name))
+            if not src:
+                self.entries.pop(rel, None)
+                continue
+            e = self.entries.setdefault(rel, {k: pol[k] for k in ('mode', 'uid', 'gid')} | {'eas': dict(pol['eas'])})
+            e['src'] = src[0]
+        print('mkvendor: precompiled the SELinux policy (vendor mapping %s)' % vers)
+
     def add_stock_libs(self, listfile, meta):
         pairs = []
         for line in open(listfile, encoding='utf-8'):
@@ -392,6 +437,7 @@ def main():
     v.patch_gui()
     v.resign_cacert()
     v.apply_table()
+    v.precompile_sepolicy()
     v.write_image()
 
 
