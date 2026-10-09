@@ -455,6 +455,37 @@ stage_xp8() {
     q_put "$W/rw-system.sh" /system/bin/rw-system.sh u:object_r:phhsu_exec:s0
     q_meta /system/bin/rw-system.sh 0100755 u:object_r:phhsu_exec:s0
     q "sif /system/bin/rw-system.sh gid 2000"
+    # The 4.4 kernel has no blkio controller (CONFIG_BLK_CGROUP is off).
+    dump /system/etc/cgroups.json "$W/cgroups.json"
+    dump /system/etc/task_profiles.json "$W/task_profiles.json"
+    python3 - "$W/cgroups.json" "$W/task_profiles.json" <<'PY'
+import json, sys
+cg, tp = (json.load(open(p)) for p in sys.argv[1:])
+n = len(cg["Cgroups"])
+cg["Cgroups"] = [c for c in cg["Cgroups"] if c["Controller"] != "blkio"]
+if len(cg["Cgroups"]) != n - 1:
+    sys.exit("cgroups.json: no blkio controller to remove")
+io = {"LowIoPriority", "NormalIoPriority", "HighIoPriority", "MaxIoPriority"}
+for p in tp["Profiles"]:
+    blkio = [a for a in p["Actions"] if a.get("Params", {}).get("Controller") == "blkio"]
+    if p["Name"] in io:
+        if [a["Name"] for a in blkio] != ["JoinCgroup"]:
+            sys.exit("task_profiles.json: %s has no single blkio JoinCgroup" % p["Name"])
+        io.remove(p["Name"])
+        p["Actions"] = [a for a in p["Actions"] if a not in blkio]
+    elif blkio:
+        sys.exit("task_profiles.json: %s also uses blkio" % p["Name"])
+if io:
+    sys.exit("task_profiles.json: missing %s" % ", ".join(sorted(io)))
+for d, p in zip((cg, tp), sys.argv[1:]):
+    with open(p, "w") as f:
+        json.dump(d, f, indent=2)
+        f.write("\n")
+PY
+    q "rm /system/etc/cgroups.json"
+    q_put "$W/cgroups.json" /system/etc/cgroups.json u:object_r:cgroup_desc_file:s0
+    q "rm /system/etc/task_profiles.json"
+    q_put "$W/task_profiles.json" /system/etc/task_profiles.json u:object_r:task_profiles_file:s0
     dump /system/etc/ueventd.rc "$W/ueventd.rc"
     printf '\nparallel_restorecon enabled\n' >> "$W/ueventd.rc"
     q "rm /system/etc/ueventd.rc"
