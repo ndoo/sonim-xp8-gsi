@@ -3,14 +3,18 @@
 # SPDX-License-Identifier: MIT
 #
 # Flash the GSI over fastboot: boot, vendor, then system last, on one slot.
-# Needs an unlocked bootloader. Writes nothing else unless asked.
+# Needs an unlocked bootloader. From slot a it first prepares slot b for A/B
+# updates (abl_b, mdtpsecapp_b, modem_b, as scripts/enable-ab.sh does).
+# Writes nothing else unless asked.
 #
-# usage: SERIAL=... scripts/flash.sh [options]
+# usage: SERIAL=... scripts/flash.sh --backup DIR [options]
+#   --backup DIR   your backup from scripts/dump-stock.sh (slot b's mdtpsecapp and modem)
+#   --abl FILE     the userdebug abl.elf (default: work/userdebug/abl.elf)
 #   --dir DIR      directory with boot.img, vendor.img and system.img (default: out)
 #   --boot FILE    --vendor FILE    --system FILE    override single images
 #   --only LIST    write only these of boot,vendor,system (comma-separated), e.g.
 #                  --only system to update system and keep boot, vendor and data
-#   --slot a|b     slot to write (default: the current slot); b needs scripts/enable-ab.sh
+#   --slot a|b     slot to write (default: the current slot)
 #   --activate     then make that slot the active one (fastboot set_active)
 #   --switch a|b   write nothing; make that slot active and reboot
 #   --wipe         fastboot erase userdata; required when coming from stock or any
@@ -23,11 +27,13 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 # shellcheck source=lib/device.sh
 . "$ROOT/scripts/lib/device.sh"
-usage() { sed -n '5,20s/^# \{0,1\}//p' "$0" >&2; exit 2; }
+usage() { sed -n '5,24s/^# \{0,1\}//p' "$0" >&2; exit 2; }
 
-DIR=$ROOT/out BOOT='' VENDOR='' SYSTEM='' ONLY='' WIPE=0 MISC=0 MISCONLY=0 SLOT='' ACTIVATE=0 SWITCH=''
+ABL=$ROOT/work/userdebug/abl.elf BACKUP='' DIR=$ROOT/out BOOT='' VENDOR='' SYSTEM='' ONLY='' WIPE=0 MISC=0 MISCONLY=0 SLOT='' ACTIVATE=0 SWITCH=''
 while [ $# -gt 0 ]; do
     case $1 in
+        --backup) BACKUP=$2; shift 2 ;;
+        --abl) ABL=$2; shift 2 ;;
         --dir) DIR=$2; shift 2 ;;
         --boot) BOOT=$2; shift 2 ;;
         --vendor) VENDOR=$2; shift 2 ;;
@@ -67,6 +73,15 @@ for f in ${BOOT:+"$BOOT"} ${VENDOR:+"$VENDOR"} ${SYSTEM:+"$SYSTEM"}; do
     }
 done
 
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/xp8-flash.XXXXXX")
+trap 'rm -rf "$WORK"' EXIT
+if [ -n "$BOOT$VENDOR$SYSTEM" ]; then
+    [ -n "$BACKUP" ] || die "--backup: name your backup directory; flash.sh copies slot b's firmware from it"
+    need_tools zstd awk
+    BACKUP=$(cd "$BACKUP" && pwd)
+    slot_b_inputs "$ABL"
+fi
+
 # Checksums written by assemble.sh and listed in the release SHA256SUMS, when present.
 verify_listed() {
     local list=$1 f want
@@ -92,7 +107,8 @@ SLOT=${SLOT:-$CUR}
 
 if [ -n "$SWITCH" ]; then
     [ "$SWITCH" != "$CUR" ] || { say "slot $CUR is already active"; F reboot || true; exit 0; }
-    confirm switch "About to make slot $SWITCH active on $SERIAL (now $CUR) and reboot. Nothing is written."
+    confirm switch "About to make slot $SWITCH active on $SERIAL (now $CUR) and reboot. Nothing is written.
+Slot b boots only if flash.sh or enable-ab.sh prepared its firmware."
     F set_active "$SWITCH"
     settle 0
     [ "$(fb_var current-slot)" = "$SWITCH" ] || die "current-slot is not $SWITCH after set_active; stop"
@@ -121,11 +137,9 @@ for pair in ${BOOT:+"boot_$SLOT:$BOOT"} ${VENDOR:+"vendor_$SLOT:$VENDOR"} ${SYST
 done
 
 
-ZERO=
+ZERO=$WORK/misc-zero.img
 if [ $MISC = 1 ]; then
     [ "$(part_size misc)" = 1048576 ] || die "misc is not 1 MiB; not clearing it"
-    ZERO=$(mktemp "${TMPDIR:-/tmp}/xp8-misc.XXXXXX")
-    trap 'rm -f "$ZERO"' EXIT
     head -c 1048576 /dev/zero > "$ZERO"
 fi
 
@@ -136,7 +150,17 @@ if [ $MISCONLY = 1 ]; then
     exit 0
 fi
 
+# Running from slot b means abl_b answers fastboot flash, which the stock ABL does not.
+PREP=0
+if [ "$CUR" = a ]; then
+    PREP=1
+else
+    say "current slot is b; slot b firmware is not written"
+fi
+
 plan="About to write to $SERIAL over fastboot (current slot $CUR):"
+[ $PREP = 1 ] && plan+="
+$SLOTB_PLAN"
 [ -n "$BOOT" ] && plan+="
   boot_$SLOT    $BOOT"
 [ -n "$VENDOR" ] && plan+="
@@ -154,6 +178,7 @@ if [ $WIPE = 0 ]; then
 fi
 confirm flash "$plan"
 
+[ $PREP = 1 ] && slot_b_write
 [ -n "$BOOT" ] && flash_settle "boot_$SLOT" "$BOOT"
 [ -n "$VENDOR" ] && flash_settle "vendor_$SLOT" "$VENDOR"
 [ $MISC = 1 ] && flash_settle misc "$ZERO"

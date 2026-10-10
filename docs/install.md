@@ -45,7 +45,11 @@ Two routes share the same start and end:
 - **Route B**: build the components and the system image in Docker from
   pinned public downloads; see [building.md](building.md).
 
-Only slot `_a` is changed. Slot `_b` stays stock and is not a fallback.
+The GSI is installed to slot `_a`. `flash.sh` also writes slot `_b`'s
+firmware (`abl_b`, `mdtpsecapp_b`, `modem_b`), so that
+[updates over the air](#update-over-the-air-ab) can install to it. Slot
+`_b` holds no GSI until the first update and is not a fallback before
+that.
 
 ## Prerequisites
 
@@ -306,16 +310,20 @@ Put the phone in fastboot: power off, hold Vol- and press Power. If adb is
 enabled, the script reboots the phone to fastboot itself.
 
 ```sh
-scripts/flash.sh --wipe
+scripts/flash.sh --backup "$BACKUP" --wipe
 ```
 
 The script stops if `fastboot devices` shows a serial other than
-`$SERIAL`. It checks that `fastboot getvar unlocked` is `yes` and
-`current-slot` is `a`, checks each image against `out/assemble.sha256`,
-`out/SHA256SUMS` and the partition size, asks you to type `flash`, then
-writes `boot_a` and `vendor_a`, erases `userdata` and writes `system_a`
-last. The erase is a discard that returns within seconds; the phone formats
-`/data` on the first boot.
+`$SERIAL`. It checks `work/userdebug/abl.elf` (`--abl` names another path)
+and your backup's `mdtpsecapp_a` and `modem_a` against their SHA-256,
+checks that `fastboot getvar unlocked` is `yes` and reads `current-slot`
+(`a`), checks each image against `out/assemble.sha256`, `out/SHA256SUMS`
+and the partition size, and asks you to type `flash`. It then prepares
+slot b (writes the userdebug ABL to `abl_b` and copies `mdtpsecapp_a` and
+`modem_a` to `mdtpsecapp_b` and `modem_b`), writes `boot_a` and
+`vendor_a`, erases `userdata` and writes `system_a` last. The erase is a
+discard that returns within seconds; the phone formats `/data` on the
+first boot.
 
 The bootloader acknowledges a write at once and keeps writing for about
 1 s per 15 MB. The script waits after each write
@@ -396,24 +404,26 @@ when you switch root on or off.
 3. Flash without `--wipe`:
 
    ```sh
-   scripts/flash.sh
+   scripts/flash.sh --backup "$BACKUP"
    ```
 
-   This writes `boot_a`, `vendor_a` and `system_a`, with `boot_a` from
-   step 2. Its warning about `--wipe` applies only when coming from stock
-   Android or another ROM.
+   This prepares slot b and writes `boot_a`, `vendor_a` and `system_a`,
+   with `boot_a` from step 2. If the phone runs from slot b after an
+   update over the air, it writes `boot_b`, `vendor_b` and `system_b`
+   instead and leaves the slot firmware as it is. Its warning about
+   `--wipe` applies only when coming from stock Android or another ROM.
 
 To write only some images, name them with `--only`; the others and user
 data are left as they are. For a release that changes only the system
 image:
 
 ```sh
-scripts/flash.sh --only system
+scripts/flash.sh --backup "$BACKUP" --only system
 ```
 
-`--only vendor,system` writes both and keeps `boot_a`. `flash.sh` waits
-after each write until the phone has finished writing (about 1 s per 15 MB,
-plus 5 s).
+`--only vendor,system` writes both and keeps `boot_a`. Slot b is prepared
+in every case. `flash.sh` waits after each write until the phone has
+finished writing (about 1 s per 15 MB, plus 5 s).
 
 If a command prints `unknown command` or hangs, hold Power 10-15 s; see
 [Fastboot stall](troubleshooting.md#fastboot-stall).
@@ -425,15 +435,14 @@ the phone runs, into the other slot. Your data, root choice, boot image and
 vendor image carry over; a failed update leaves the old slot to fall back
 to. This needs:
 
-- a vendor image assembled from a release with A/B OTA support (it sets
-  `ro.vendor.build.ab_ota_partitions`); update once as in
-  [Update to a newer release](#update-to-a-newer-release) if yours is older;
-- slot b prepared once (from fastboot, slot a active; writes `abl_b`,
-  `mdtpsecapp_b` and `modem_b`, nothing on slot a):
+- slot b prepared, and a vendor image that `flash.sh` wrote while it
+  prepared slot b (`ro.vendor.xp8.layout` 3). If your vendor image is
+  older, System update says **Update needs a computer**: update once as in
+  [Update to a newer release](#update-to-a-newer-release).
 
-  ```sh
-  scripts/enable-ab.sh --abl work/userdebug/abl.elf "$BACKUP"
-  ```
+Up to `a16-20261010`, System update could install to a slot b that still
+had the stock bootloader; see
+[Update installed to an unprepared slot b](errata/slot-b-unprepared.md).
 
 Then open **Settings → System → System update**. It checks the latest
 release and offers **Download & install**: `update_engine` streams the

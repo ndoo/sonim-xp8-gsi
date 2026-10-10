@@ -109,5 +109,6 @@ cat <<EOF
 $PROG: the phone starts from slot a, with your data. Unlock it with your PIN.
 Before you install another update, prepare slot b (fastboot, data kept):
   SERIAL=... scripts/enable-ab.sh --abl work/userdebug/abl.elf "$BACKUP"
+or update from a computer with scripts/flash.sh, which prepares it too.
 See docs/errata/slot-b-unprepared.md.
 EOF

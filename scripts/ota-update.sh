@@ -4,8 +4,8 @@
 #
 # Install a release's A/B OTA payload with update_engine on the running phone:
 # it writes system to the other slot, copies boot and vendor across, and makes
-# that slot active for the next boot. User data is kept. Needs slot b prepared
-# once with scripts/enable-ab.sh, and a vendor image with A/B OTA support.
+# that slot active for the next boot. User data is kept. Needs a vendor image
+# of the layout ota.json names, which flash.sh writes after preparing slot b.
 #
 # usage: SERIAL=... scripts/ota-update.sh [--json URL|FILE] [--work DIR] [--yes]
 #   --json URL|FILE  ota.json of the release to install (default: the latest release)
@@ -64,7 +64,7 @@ case $CUR in _a) NEXT=b ;; _b) NEXT=a ;; *) die "no ro.boot.slot_suffix on $SERI
 [[ ",$(prop ro.vendor.build.ab_ota_partitions)," == *,boot,*vendor,* ]] ||
     die "this vendor image has no A/B OTA support (ro.vendor.build.ab_ota_partitions); assemble and flash this release's vendor first"
 [ "$(prop ro.vendor.xp8.layout | grep -x '[0-9]*' || echo 1)" -ge "$LAYOUT" ] ||
-    die "$TAG needs a newer vendor image (ro.vendor.xp8.layout $LAYOUT); update from a computer once (docs/install.md#update-to-a-newer-release), then OTA works again"
+    die "$TAG needs a newer vendor image (ro.vendor.xp8.layout $LAYOUT); update from a computer once (docs/install.md#update-to-a-newer-release), which also prepares slot b; then OTA works again"
 avail=$(A shell df -k /data | awk 'NR == 2 {print $4}' | tr -d '\r')
 [ "${avail:-0}" -gt $((SIZE / 1024 + 524288)) ] || die "/data has ${avail:-0} KiB free; the payload needs $((SIZE / 1024)) KiB plus 512 MiB"
 

@@ -278,6 +278,39 @@ backup_image() {
     say "$name: checksum OK"
 }
 
+# Slot-b firmware from the userdebug ABL $1 and BACKUP's mdtpsecapp_a and modem_a,
+# checked against the supported build. Needs WORK. Sets SLOTB_ABL, SLOTB_MDTP, SLOTB_MODEM.
+slot_b_inputs() {
+    local abl=$1
+    [ -f "$abl" ] || die "no such file: $abl"
+    [ "$(sha256 "$abl")" = "$ABL_SHA256" ] || die "$abl has the wrong SHA-256; expected $ABL_SHA256"
+    [ -f "$BACKUP/SHA256SUMS" ] || die "$BACKUP/SHA256SUMS missing"
+    SLOTB_ABL=$WORK/abl_padded.img
+    { cat "$abl"; head -c $((1048576 - $(fsize "$abl"))) /dev/zero; } > "$SLOTB_ABL"
+    [ "$(sha256 "$SLOTB_ABL")" = "$ABL_PADDED_SHA256" ] || die "padded ABL has an unexpected SHA-256"
+    backup_image mdtpsecapp_a
+    SLOTB_MDTP=$IMG
+    backup_image modem_a
+    SLOTB_MODEM=$IMG
+    if [ "$(sha256 "$SLOTB_MDTP")" != "$MDTPSECAPP_A_SHA256" ] || [ "$(sha256 "$SLOTB_MODEM")" != "$MODEM_A_SHA256" ]; then
+        die "mdtpsecapp_a or modem_a in $BACKUP is not from the supported build $SUPPORTED_BUILD_ID; stop"
+    fi
+}
+
+SLOTB_PLAN="  abl_b         userdebug ABL, zero-padded to 1 MiB (the image abl_a holds)
+  mdtpsecapp_b  mdtpsecapp_a from your backup
+  modem_b       modem_a from your backup"
+
+# Writes slot b's firmware over fastboot; the current slot must be a.
+slot_b_write() {
+    [ "$(fb_var current-slot)" = a ] || die "current slot is not a; slot b firmware is written only from slot a"
+    flash_settle abl_b "$SLOTB_ABL"
+    flash_settle mdtpsecapp_b "$SLOTB_MDTP"
+    flash_settle modem_b "$SLOTB_MODEM"
+    [ "$(fb_var current-slot)" = a ] || die "current slot changed; stop"
+    say "slot b firmware written"
+}
+
 # misc image holding a bootloader message that starts recovery with --wipe_data.
 make_wipe_bcb() {
     py3 - "$1" <<'PY'

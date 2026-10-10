@@ -159,5 +159,6 @@ scripts/restore-stock.sh --restore-persist "$BACKUP"
 
 Unless you relocked, the bootloader is still unlocked. Run
 [install steps 4 to 7](install.md#route-a-install-from-the-release) again;
-`scripts/flash.sh --wipe` installs the GSI and erases the stock data. After a
-relock, unlock again first ([install step 2](install.md#2-unlock-the-bootloader)).
+`scripts/flash.sh --backup "$BACKUP" --wipe` installs the GSI and erases the
+stock data. After a relock, unlock again first
+([install step 2](install.md#2-unlock-the-bootloader)).

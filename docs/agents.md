@@ -30,8 +30,12 @@ the repository root.
    --set-active` or `fastboot set_active` (except `fastboot set_active a`
    in the restore recovery below, after approval), `fastboot flashing
    unlock_critical`, or anything for slot `_b` except through
-   `scripts/enable-ab.sh`, `scripts/flash.sh --slot`/`--switch` and
-   `scripts/ota-update.sh` after the user approved that step. Never interrupt a running
+   `scripts/enable-ab.sh`, `scripts/flash.sh` (it prepares slot b's
+   firmware; `--slot`, `--switch`) and `scripts/ota-update.sh` after the
+   user approved that step. Never start an over-the-air update (System
+   update or `ota-update.sh`) on a phone whose `ro.vendor.xp8.layout` is
+   below 3: its slot b may hold the stock ABL
+   ([erratum](errata/slot-b-unprepared.md)). Never interrupt a running
    fastboot command, and never send a fastboot command while a script is
    waiting for a write to finish. On a stall, ask the user to hold Power
    10-15 s.
@@ -139,13 +143,16 @@ Pass: the last line is `boot.img has no root` or `boot.img includes Magisk
 Precondition: the phone is in fastboot (ask the user to power off, hold Vol-
 and press Power) or in adb; `fastboot devices` lists `$SERIAL`. The script
 checks `unlocked` → `yes` and reads `current-slot`.
-Run: `scripts/flash.sh --wipe`.
-Expect: `checksum OK` lines; after each flash and after the erase a
-`waiting N s for the phone to finish writing` line; `all writes done`. Let
-each wait run out; do not send fastboot commands during it.
+Run: `scripts/flash.sh --backup "$BACKUP" --wipe`.
+Expect: `mdtpsecapp_a: checksum OK`, `modem_a: checksum OK` and the image
+`checksum OK` lines; the plan lists `abl_b`, `mdtpsecapp_b` and `modem_b`
+before `boot_a`; `slot b firmware written`; after each flash and after the
+erase a `waiting N s for the phone to finish writing` line; `all writes
+done`. Let each wait run out; do not send fastboot commands during it.
 Fail: `fastboot stopped answering` or a stall → ask the user to hold Power
 10-15 s, enter fastboot again, then **STOP** and ask before running
-`scripts/flash.sh --wipe` again (it writes every image again). All writes
+`scripts/flash.sh --backup "$BACKUP" --wipe` again (it writes every image
+again). All writes
 are complete once `all writes done` is printed.
 
 **R10. First boot.** Tell the user that one extra early reboot during the

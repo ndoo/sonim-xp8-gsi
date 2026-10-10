@@ -38,8 +38,8 @@ Both slots hold the same firmware on the supported build, except
 `mdtpsecapp_b` (a different build of the MDTP trusted app). `abl_b` holds the
 stock ABL. The inactive slot's partitions carry Qualcomm's inactive type
 GUID (`77036cd4-…`); a slot switch swaps the type GUIDs of every `_a`/`_b`
-pair. The install writes slot `_a`. Slot `_b` is used only after
-`scripts/enable-ab.sh` has prepared it, see [A/B updates](#ab-updates).
+pair. The install writes the GSI to slot `_a`; from slot `_a`, `flash.sh`
+also writes the slot-b firmware, see [A/B updates](#ab-updates).
 
 ## Partitions
 
@@ -52,7 +52,7 @@ required partitions exist; `unlock.sh` checks the `abl_a` and `frp` sizes.
 | `system_a` | 4 GiB | Stock system with `/system/vendor`; the GSI goes here. `assemble.sh` reads the stock vendor tree, properties and libraries from the backup copy |
 | `vendor_a` | 1 GiB | Empty on stock; the assembled vendor image goes here |
 | `abl_a` | 1 MiB | Bootloader. `unlock.sh` writes the userdebug ABL; `--relock` writes the stock one back |
-| `abl_b`, `mdtpsecapp_b`, `modem_b` | 1 MiB, 4 MiB, 110 MiB | Slot-b firmware; `enable-ab.sh` writes the userdebug ABL and copies `mdtpsecapp_a` and `modem_a`. `--relock` writes the stock `abl_b` back |
+| `abl_b`, `mdtpsecapp_b`, `modem_b` | 1 MiB, 4 MiB, 110 MiB | Slot-b firmware; `flash.sh` (from slot a) and `enable-ab.sh` write the userdebug ABL and copy `mdtpsecapp_a` and `modem_a`. `--relock` writes the stock `abl_b` back |
 | `boot_b`, `system_b`, `vendor_b` | as slot a | Written by `flash.sh --slot b` or by `update_engine` (`ota-update.sh`) |
 | `frp` | 512 KiB | Factory Reset Protection data; the last byte (offset 524287) is the OEM-unlock flag |
 | `misc` | 1 MiB | Bootloader control block; stock content is all zeros |
@@ -129,7 +129,7 @@ removed entry:
 | `ro.telephony.default_network=9,9`, `telephony.lteOnCdmaDevice=0` | Replace the stock values: LTE/GSM/WCDMA on both slots, no CDMA | [`vendor/props/override.prop`](../vendor/props/override.prop) |
 | `ro.adb.secure=1`, `ro.debuggable=0`, `persist.sys.usb.config=none` | Stock user-build adb policy: host authorization, no `adb root`. The GSI's `/system/build.prop` enables adb, so adb is off after every wipe until turned on in Developer options | [`vendor/props/append.prop`](../vendor/props/append.prop) |
 | `ro.product.property_source_order=vendor,odm,product,system_ext,system` | The phone reports the stock model Sonim XP8800 and fingerprint `Sonim/XP8800/XP8800:16/...`; Device name defaults to `XP8800` | [`vendor/props/append.prop`](../vendor/props/append.prop) |
-| `ro.vendor.xp8.layout=2` | The repo's overlays, side keys, boot scripts and audio patches are on `system`, where A/B OTAs carry them; `xp8-gsi.rc` there acts only with this property, and `ota.json` names the lowest layout a payload needs (`min_vendor_layout`) | [`vendor/props/append.prop`](../vendor/props/append.prop) |
+| `ro.vendor.xp8.layout=3` | Layout 2: the repo's overlays, side keys, boot scripts and audio patches are on `system`, where A/B OTAs carry them; `xp8-gsi.rc` there acts only when this property is set. Layout 3: the image was written by a `flash.sh` that also prepared slot b. `ota.json` names the lowest layout a payload needs (`min_vendor_layout`, 3) | [`vendor/props/append.prop`](../vendor/props/append.prop) |
 | `ro.telephony.sim_slots.count=2`, `ro.com.android.dataroaming=false` | Two SIM slots; the stock roaming default. The GSI's product `build.prop` loads later and overrides it (see [System image changes](#system-image-changes)) | [`vendor/props/append.prop`](../vendor/props/append.prop) |
 | 190 libraries copied from stock `/system/lib*` and `/system/product/lib*` | Stock vendor blobs link against them (mostly non-VNDK HIDL interface libraries, plus `libdrm`, `libchrome`, `libinput` and others). The GSI's linker namespace for vendor processes cannot see them on `/system`; without them about 40 HALs fail with `CANNOT LINK EXECUTABLE`, including `qcrild`, audio, camera and the hardware composer. The list is specific to this stock build and GSI | [`vendor/libs.txt`](../vendor/libs.txt) |
 | `etc/cgroups.json` mounting memcg v1 at `/dev/memcg` | Android 16's `cgroups.json` mounts memory cgroups only on v2. Without a memcg mount `lmkd` exits and `system_server` dies waiting for its socket | [`vendor/cgroups.json`](../vendor/cgroups.json) |
@@ -145,8 +145,9 @@ removed entry:
 [`vendor/xp8-gsi.sh`](../vendor/xp8-gsi.sh) (started at `boot_completed`),
 installed on `system` as `/system/etc/init/xp8-gsi.rc` and `/system/bin/`,
 so that A/B OTAs update them. Every trigger also needs
-`ro.vendor.xp8.layout=2`, which the vendor image sets: an older vendor
-image still carries its own copy of these files.
+`ro.vendor.xp8.layout` (2 or later), which the vendor image sets: a
+layout-1 vendor image sets none and still carries its own copy of these
+files.
 
 | Item | Why |
 |---|---|
@@ -243,7 +244,7 @@ for every partition in `ro.vendor.build.ab_ota_partitions`
 
 | Step | What runs |
 |---|---|
-| Prepare slot b once | `enable-ab.sh` over fastboot: userdebug ABL to `abl_b` (XBL loads the ABL of the active slot; the stock ABL has no `flash` or `set_active`), `mdtpsecapp_a` and `modem_a` to `_b` |
+| Prepare slot b | Every `flash.sh` run from slot a, before it writes the GSI, and `enable-ab.sh` on its own, over fastboot: userdebug ABL to `abl_b` (XBL loads the ABL of the active slot; the stock ABL has no `flash` or `set_active`), `mdtpsecapp_a` and `modem_a` to `_b`. Nothing on the phone shows without root what slot b holds, so the vendor image stands in for it: `ro.vendor.xp8.layout=3` comes only from a vendor image that `flash.sh` wrote, and `ota.json` asks for layout 3, so System update and `ota-update.sh` send a phone whose vendor image is older to a PC update ([erratum](errata/slot-b-unprepared.md)) |
 | Check and install | Settings → System update opens `XP8Updater` (`/system/system_ext/priv-app`, platform-signed, intent-filter priority 100 so it comes before Play services' `SystemUpdateActivity`). It reads `releases/latest/download/ota.json`, compares its `tag` with `ro.xp8.release` (set by `build-system.sh` from `XP8_RELEASE`) and `min_vendor_layout` with `ro.vendor.xp8.layout`, and calls `UpdateEngine.applyPayload` with the payload URL, so `update_engine` streams it from GitHub. `ota-update.sh` does the same from a computer over adb |
 | Notifications | While `update_engine` is busy, the foreground service `UpdateService` binds it and keeps an ongoing progress notification; Pause and Resume call `UpdateEngine.suspend`/`resume`. At `UPDATED_NEED_REBOOT` it posts Restart now, and on a failed apply it posts the error. `UpdateCheckJob` reads `ota.json` once a day and posts "System update available" once per tag; for an installable tag it schedules a one-off job that needs an unmetered network and battery not low, which calls `applyPayload` with `NETWORK_ID` set to that network, so the download does not move to mobile data. The download job is not scheduled, and does not start, while `Settings.Global` `ota_disable_automatic_update` is 1 (Developer options > Automatic system updates off); the System update screen has a switch for the same setting, written with `WRITE_SECURE_SETTINGS`. An automatic download that fails posts nothing and is scheduled again by the next daily check. Download & install refuses while the battery is low and the phone is not charging. After a boot whose `ro.xp8.release` differs from the last boot, `BootReceiver` posts "System updated". `POST_NOTIFICATIONS` is granted by `system_ext/etc/default-permissions/default-permissions-xp8updater.xml` |
 | Install | `update_engine` writes `system` to the other slot, copies `boot` and `vendor`, and makes that slot active through the boot control HAL (`bootctrl.sdm660`) |
