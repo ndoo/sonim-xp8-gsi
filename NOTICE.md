@@ -11,6 +11,7 @@ no APK, no firmware, no bootloader and no EDL loader.
 |---|---|
 | Everything not listed below | MIT, see [LICENSE](LICENSE) |
 | `system/**.smali`, `system/**.smali.diff`, `system/**.smali.patch`, `system/messaging/*.diff` (derived from AOSP code) | Apache-2.0, see [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) |
+| `vendor/updater/res/drawable/ic_system_update.xml` (Google Material Icons), `vendor/keys/app/res/drawable/ic_programmable_keys.xml` (Pictogrammers Material Design Icons) | Apache-2.0, see [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) |
 | `vendor/audio/*.diff` (diffs against Qualcomm/CAF audio configuration files) | BSD-3-Clause, see [LICENSES/BSD-3-Clause.txt](LICENSES/BSD-3-Clause.txt) |
 
 The per-file licence information follows the [REUSE](https://reuse.software/)

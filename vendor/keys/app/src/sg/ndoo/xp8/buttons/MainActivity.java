@@ -9,16 +9,18 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.graphics.Typeface;
+import android.graphics.Insets;
 import android.os.Bundle;
-import android.util.TypedValue;
-import android.view.View;
+import android.preference.ListPreference;
+import android.preference.Preference;
+import android.preference.PreferenceCategory;
+import android.preference.PreferenceFragment;
+import android.preference.PreferenceScreen;
+import android.provider.Settings;
 import android.text.InputType;
-import android.widget.Button;
+import android.view.MenuItem;
+import android.view.WindowInsets;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.TextView;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,10 +30,10 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * Settings for the XP8 side keys. Writes files/keys.properties; the side-key daemon
- * (vendor/keys/Xp8Keys.java) reads it on every key press.
+ * Settings > Programmable keys: what the XP8 side keys do. Writes files/keys.properties;
+ * the side-key daemon (vendor/keys/Xp8Keys.java) reads it on every key press.
  *
- * Per key (ptt, sos, camera):
+ * Per key (ptt, camera, sos; shown with Sonim's names PTT, YELLOW and ALARM):
  *   KEY.forward  "" (off), "*" (every push-to-talk app) or a package: press and
  *                release go to that app as on stock (Sonim, Kodiak or MCPTT intents)
  *   KEY.short    action on a short press, when not forwarding
@@ -43,8 +45,8 @@ import java.util.Properties;
  *          launch:<package>/<activity>
  */
 public class MainActivity extends Activity {
-    static final String[] KEYS = {"ptt", "sos", "camera"};
-    static final String[] TITLES = {"PTT key", "SOS key", "Camera key"};
+    static final String[] KEYS = {"ptt", "camera", "sos"};
+    static final String[] TITLES = {"PTT key", "YELLOW key", "ALARM key"};
     static final String[] PTT_ACTIONS = {"com.sonim.intent.action.PTT_KEY_DOWN",
         "com.kodiak.intent.action.PTT_BUTTON", "com.mcx.intent.action.CRITICAL_COMMUNICATION_CONTROL_KEY"};
     static final String[] SOS_ACTIONS = {"com.sonim.intent.action.SOS_KEY_DOWN",
@@ -52,25 +54,45 @@ public class MainActivity extends Activity {
 
     final Properties config = new Properties();
     File file;
-    LinearLayout list;
+    PreferenceScreen screen;
+
+    public static class KeysFragment extends PreferenceFragment {
+        @Override
+        public void onCreate(Bundle saved) {
+            super.onCreate(saved);
+            MainActivity a = (MainActivity) getActivity();
+            a.screen = getPreferenceManager().createPreferenceScreen(a);
+            setPreferenceScreen(a.screen);
+            a.render();
+        }
+    }
 
     @Override
     protected void onCreate(Bundle saved) {
-        super.onCreate(saved);
+        // Before super.onCreate, which recreates a saved KeysFragment.
         file = new File(getFilesDir(), "keys.properties");
         defaults();
         if (file.exists()) {
             try (FileInputStream in = new FileInputStream(file)) { config.load(in); } catch (Exception e) { }
         }
-        ScrollView scroll = new ScrollView(this);
-        list = new LinearLayout(this);
-        list.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(16);
-        list.setPadding(pad, pad, pad, pad);
-        scroll.addView(list);
-        setContentView(scroll);
-        scroll.setFitsSystemWindows(true);
-        render();
+        super.onCreate(saved);
+        getActionBar().setDisplayHomeAsUpEnabled(true);
+        findViewById(android.R.id.content).setOnApplyWindowInsetsListener((v, in) -> {
+            Insets b = in.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+            v.setPadding(b.left, b.top, b.right, b.bottom);
+            return WindowInsets.CONSUMED;
+        });
+        if (saved == null)
+            getFragmentManager().beginTransaction().replace(android.R.id.content, new KeysFragment()).commit();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     void defaults() {
@@ -89,32 +111,69 @@ public class MainActivity extends Activity {
     }
 
     void render() {
-        list.removeAllViews();
-        list.addView(text("XP8 Buttons", 22, true));
-        list.addView(text("Choose what the side keys do. A key that sends to a push-to-talk app works like on "
-                + "stock: hold to talk, also with the app in the background. Otherwise a short and a long "
-                + "press can each run an action: flashlight, camera, a call, an app and more. "
-                + "A long press lasts as long as the touch & hold delay in Accessibility settings. "
-                + "Changes apply on the next key press.", 14, false));
+        screen.removeAll();
         for (int i = 0; i < KEYS.length; i++) {
             String key = KEYS[i];
-            list.addView(gap());
-            list.addView(text(TITLES[i], 18, true));
+            PreferenceCategory cat = new PreferenceCategory(this);
+            cat.setTitle(TITLES[i]);
+            screen.addPreference(cat);
             String fwd = config.getProperty(key + ".forward", "");
-            list.addView(row("Send to push-to-talk app", forwardLabel(fwd), v -> chooseForward(key)));
-            if (!fwd.isEmpty())
-                list.addView(row("Press and hold to engage", holdLabel(config.getProperty(key + ".hold", "0")), v -> chooseHold(key)));
+            cat.addPreference(pref("Send to push-to-talk app", forwardLabel(fwd), () -> chooseForward(key)));
+            if (!fwd.isEmpty()) cat.addPreference(hold(key));
             boolean on = fwd.isEmpty();
-            View s = row("Short press", actionLabel(config.getProperty(key + ".short", "none")), v -> chooseAction(key, "short"));
-            View l = row("Long press", actionLabel(config.getProperty(key + ".long", "none")), v -> chooseAction(key, "long"));
+            String off = "Off while this key sends to a push-to-talk app";
+            Preference s = pref("Short press", on ? actionLabel(config.getProperty(key + ".short", "none")) : off,
+                () -> chooseAction(key, "short"));
+            Preference l = pref("Long press", on ? actionLabel(config.getProperty(key + ".long", "none")) : off,
+                () -> chooseAction(key, "long"));
             s.setEnabled(on);
             l.setEnabled(on);
-            s.setAlpha(on ? 1f : 0.4f);
-            l.setAlpha(on ? 1f : 0.4f);
-            list.addView(s);
-            list.addView(l);
-            if (!on) list.addView(text("Short and long press are off while this key sends to a push-to-talk app.", 12, false));
+            cat.addPreference(s);
+            cat.addPreference(l);
         }
+        // Settings has no exported Timing controls page; open Accessibility with that row highlighted.
+        screen.addPreference(pref("Long press delay", longPressLabel(), () -> startActivity(
+            new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                .putExtra(":settings:fragment_args_key", "tap_assistance_preference_screen"))));
+    }
+
+    String longPressLabel() {
+        int ms = Settings.Secure.getInt(getContentResolver(), "long_press_timeout", 400);
+        return ms == 400 ? "Short" : ms == 1000 ? "Medium" : ms == 1500 ? "Long" : ms + " ms";
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (screen != null) render();
+    }
+
+    Preference pref(String title, String summary, Runnable click) {
+        Preference p = new Preference(this);
+        p.setPersistent(false);
+        p.setTitle(title);
+        p.setSummary(summary);
+        p.setOnPreferenceClickListener(x -> { click.run(); return true; });
+        return p;
+    }
+
+    ListPreference hold(String key) {
+        ListPreference p = new ListPreference(this);
+        p.setPersistent(false);
+        p.setTitle("Press and hold to engage");
+        p.setDialogTitle("Press and hold to engage");
+        p.setEntries(HOLD_LABELS);
+        p.setEntryValues(HOLD_VALUES);
+        String ms = config.getProperty(key + ".hold", "0");
+        p.setValue(ms);
+        p.setSummary(holdLabel(ms));
+        p.setOnPreferenceChangeListener((x, v) -> {
+            config.setProperty(key + ".hold", (String) v);
+            save();
+            p.setSummary(holdLabel((String) v));
+            return true;
+        });
+        return p;
     }
 
     // Push-to-talk apps: packages that take one of the daemon's actions for this key.
@@ -139,10 +198,28 @@ public class MainActivity extends Activity {
         for (String p : pttApps(key)) { values.add(p); labels.add(appLabel(p)); }
         new AlertDialog.Builder(this).setTitle("Send to push-to-talk app")
             .setItems(labels.toArray(new String[0]), (d, w) -> {
-                config.setProperty(key + ".forward", values.get(w));
-                save();
-                render();
+                String cur = config.getProperty(key + ".forward", "");
+                if (key.equals("ptt") && values.get(w).isEmpty() && labels.size() > 2 && !cur.isEmpty()) {
+                    confirmPttOff(cur.equals("*") ? String.join(", ", labels.subList(2, labels.size())) : appLabel(cur));
+                    return;
+                }
+                setForward(key, values.get(w));
             }).show();
+    }
+
+    // Adapted from stock's prog_keys_change_pttkey_function warning.
+    void confirmPttOff(String apps) {
+        new AlertDialog.Builder(this)
+            .setMessage(apps + " will no longer get the PTT key, so you can't talk in push-to-talk calls "
+                + "with it. Turn it off?")
+            .setPositiveButton("Turn off", (d, w) -> setForward("ptt", ""))
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    void setForward(String key, String value) {
+        config.setProperty(key + ".forward", value);
+        save();
+        render();
     }
 
     void chooseAction(String key, String press) {
@@ -195,15 +272,6 @@ public class MainActivity extends Activity {
     static final String[] HOLD_VALUES = {"0", "100", "250", "500", "1000", "1250", "1500", "1750",
         "2000", "2250", "2500", "2750", "3000"};
 
-    void chooseHold(String key) {
-        new AlertDialog.Builder(this).setTitle("Press and hold to engage")
-            .setItems(HOLD_LABELS, (d, w) -> {
-                config.setProperty(key + ".hold", HOLD_VALUES[w]);
-                save();
-                render();
-            }).show();
-    }
-
     String holdLabel(String ms) {
         for (int i = 0; i < HOLD_VALUES.length; i++) if (HOLD_VALUES[i].equals(ms)) return HOLD_LABELS[i];
         return ms + " ms";
@@ -231,33 +299,5 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             return pkg;
         }
-    }
-
-    View row(String title, String value, View.OnClickListener click) {
-        Button b = new Button(this);
-        b.setAllCaps(false);
-        b.setText(title + "\n" + value);
-        b.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
-        b.setOnClickListener(click);
-        return b;
-    }
-
-    TextView text(String s, int sp, boolean bold) {
-        TextView t = new TextView(this);
-        t.setText(s);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
-        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setPadding(0, dp(4), 0, dp(4));
-        return t;
-    }
-
-    View gap() {
-        View v = new View(this);
-        v.setMinimumHeight(dp(16));
-        return v;
-    }
-
-    int dp(int v) {
-        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics());
     }
 }
