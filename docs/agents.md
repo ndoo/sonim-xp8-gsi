@@ -9,7 +9,7 @@ the repository root.
 
 1. **Ask before acting** and wait for the user's answer:
    - before every command that writes over EDL (`scripts/unlock.sh`,
-     `scripts/restore-stock.sh`);
+     `scripts/restore-stock.sh`, `scripts/edl-slot-a.sh`);
    - before every erase or wipe (`scripts/flash.sh --wipe`, the unlock in
      step 2, every `scripts/restore-stock.sh` run);
    - for the root choice: ask "root with Magisk, or no root?" and explain the
@@ -184,6 +184,16 @@ Fail: the phone ends in fastboot instead of Android → **STOP**. If
 set_active a` and `fastboot -s "$SERIAL" reboot`. If it is locked, do
 not write anything: point the user to the EDL procedure in
 [troubleshooting.md](troubleshooting.md#phone-ends-in-fastboot).
+
+**Unprepared slot b** (the PIN is rejected after a system update, or
+fastboot answers `set_active` with `unknown command`): follow
+[errata/slot-b-unprepared.md](errata/slot-b-unprepared.md#recover).
+**STOP** for approval before `scripts/edl-slot-a.sh` and again before
+`scripts/enable-ab.sh`. Do not try `fastboot set_active` or any fastboot
+write on that phone: the stock ABL rejects them.
+Expect: `unit matches the backup`, `slot a is active; resetting`.
+Fail: `do not reset the phone` → leave it in EDL, **STOP** and ask before
+running the script again.
 
 ## Reporting problems
 
