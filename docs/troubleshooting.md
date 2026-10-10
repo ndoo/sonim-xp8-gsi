@@ -39,6 +39,7 @@ Report problems as an issue at
 | `adb devices` shows `unauthorized` | Unlock the phone and accept the prompt |
 | Apps that show web pages crash or are blank, or `verify-device.sh` fails "WebView provider set" | See [WebView](#webview) |
 | Stock Android 10 shows "can't be trusted and may not work properly" at each boot | Expected after a restore; press Power. See [Verity warning on stock](#verity-warning-on-stock) |
+| After a system update the lock screen rejects the correct PIN, or `fastboot set_active a` prints `unknown command` | The update went to a slot b with the stock bootloader. See [Update installed to an unprepared slot b](errata/slot-b-unprepared.md) |
 | The phone boots to fastboot instead of Android | See [Phone ends in fastboot](#phone-ends-in-fastboot) |
 | The GSI reboots about 20 s into every boot and ends in fastboot | The bootloader is in dm-verity EIO mode and the vendor image lacks the verity EIO reboot. `fastboot -s "$SERIAL" set_active a`, then flash a vendor image assembled from this repository |
 | The GSI stays on the boot splash | Hold Power 10-15 s; the next boot continues |

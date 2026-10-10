@@ -163,6 +163,7 @@ Each step, its expected output and Route B (build from source) are in
 | [docs/install.md](docs/install.md) | Prerequisites, downloads and checksums, disk space, steps 1 to 8 for Route A (install from the release) and Route B (build from source), first boot |
 | [docs/windows.md](docs/windows.md) | Route A from a Windows host: tools, edl setup, the EDL driver |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Symptoms and fixes, manual recovery over fastboot and EDL |
+| [docs/errata/](docs/errata/) | Defects in published releases: [update installed to an unprepared slot b](docs/errata/slot-b-unprepared.md) |
 | [docs/restore.md](docs/restore.md) | Back to stock Android 10, relocking |
 | [docs/building.md](docs/building.md) | Route B: build the components and the system image in Docker, CI releases |
 | [docs/technical.md](docs/technical.md) | Device and partition facts, what the build changes and why, the unlock mechanism |
