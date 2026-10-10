@@ -147,8 +147,8 @@ xz -dk out/system.img.xz
 tar -xJf "out/xp8-gsi-components-$TAG.tar.xz" -C out
 # 4. Build boot.img and vendor.img from your backup (add --magisk for root).
 scripts/assemble.sh --docker "$BACKUP"
-# 5. Flash boot_a, vendor_a, system_a and erase userdata.
-scripts/flash.sh --wipe
+# 5. Prepare slot b's firmware, flash boot_a, vendor_a, system_a and erase userdata.
+scripts/flash.sh --backup "$BACKUP" --wipe
 # 6. After setup, enable USB debugging again and run the checks.
 scripts/verify-device.sh
 ```

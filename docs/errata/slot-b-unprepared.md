@@ -3,7 +3,10 @@
 System update installs a release into slot b, the slot the phone is not
 running. Slot b needs the bootloader and firmware that `scripts/enable-ab.sh`
 writes. Up to `a16-20261010`, the install and the update from a computer did
-not write them, and System update did not check for them. Variables
+not write them, and System update did not check for them. In later
+releases `scripts/flash.sh` prepares slot b every time it installs or
+updates the GSI, and System update installs only on a phone whose vendor
+image `flash.sh` wrote that way (`ro.vendor.xp8.layout` 3). Variables
 (`SERIAL`, `BACKUP`, `EDL`, `EDL_LOADER`) are those of
 [install.md](../install.md#variables).
 
@@ -62,7 +65,11 @@ If your phone still starts normally and you never ran `enable-ab.sh`:
    data are not touched.
 
 After that, System update can install releases again, and you can turn
-automatic updates back on.
+automatic updates back on. Releases after `a16-20261010` ask for one
+update from a computer
+([Update to a newer release](../install.md#update-to-a-newer-release))
+before they install over the air; that update also prepares slot b, so
+step 2 is then not needed.
 
 ## Recover
 

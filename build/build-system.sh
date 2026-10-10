@@ -399,7 +399,7 @@ stage_messaging() {
 
 # Repo-owned device files live on system so that A/B OTA payloads carry them;
 # vendor.img keeps what is built from stock. They act only on a vendor that sets
-# ro.vendor.xp8.layout=2 (see vendor/xp8-gsi.rc).
+# ro.vendor.xp8.layout 2 or later (see vendor/xp8-gsi.rc).
 stage_xp8() {
     log "xp8: overlays, side keys, boot scripts and vendor config patches; no Provision"
     local c=$OUT/components f

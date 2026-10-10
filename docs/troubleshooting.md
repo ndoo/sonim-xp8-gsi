@@ -33,7 +33,7 @@ Report problems as an issue at
 | The hotspot does not start after updating from an earlier install | A hotspot saved with WPA3 security cannot start: the stock hostapd HAL (1.1) has no WPA3 (SAE). Open Settings > Network & internet > Hotspot & tethering > Wi-Fi hotspot > Security and choose WPA2-Personal |
 | `fastboot format:ext4 userdata` was used and `/data` does not mount | Use `fastboot erase userdata` (`scripts/flash.sh --wipe`): the host's mke2fs 1.47 sets a feature the phone's e2fsck rejects |
 | Windows: no 9008 device is found, or the script names a driver other than WinUSB | See [EDL driver](windows.md#edl-driver) in windows.md |
-| An app says it "won't run without Google Play services, which are missing", while Play services is installed | Releases before the `XP8GmsQueryable` overlay hide Play services from apps that do not declare it in `<queries>`. Update the system image (`scripts/flash.sh --only system`); `verify-device.sh` checks "Play services visible" |
+| An app says it "won't run without Google Play services, which are missing", while Play services is installed | Releases before the `XP8GmsQueryable` overlay hide Play services from apps that do not declare it in `<queries>`. Update the system image (`scripts/flash.sh --backup "$BACKUP" --only system`); `verify-device.sh` checks "Play services visible" |
 | Play Store shows "Couldn't sign in"; `adb logcat` shows `BAD_AUTHENTICATION` | Google revoked the stored sign-in. Open Settings > Passwords, passkeys & accounts, tap the Google account and sign in again when asked (or remove and add it) |
 | `adb devices` is empty after the install | adb is off after a wipe: enable USB debugging in Developer options and tick "Always allow" |
 | `adb devices` shows `unauthorized` | Unlock the phone and accept the prompt |
@@ -63,7 +63,8 @@ named partition with an image from your own backup, checked against the
 backup's `SHA256SUMS`. Never write `xbl*`, `tz*`, `rpm*`, `hyp*`, `pmic*`,
 `keymaster*`, `keystore`, `devcfg*`, `cmnlib*` or `devinfo`, and never
 another unit's `modemst1`, `modemst2`, `fsg`, `fsc` or `persist`. Slot `_b`
-is a fallback only after `scripts/enable-ab.sh` and a full install to it.
+is a fallback only after its firmware was prepared (`scripts/flash.sh` or
+`scripts/enable-ab.sh`) and a full install to it.
 
 ### EDL shell function
 
@@ -180,7 +181,8 @@ E w abl_a work/restore/abl_a.bin
 ```
 
 `unlock.sh` also saved the `abl_a` and `frp` it replaced in
-`$BACKUP/unlock-<date>/`. Do not switch to slot `_b` unless `scripts/enable-ab.sh` has prepared it.
+`$BACKUP/unlock-<date>/`. Do not switch to slot `_b` unless
+`scripts/flash.sh` or `scripts/enable-ab.sh` has prepared it.
 
 ### Unlock: get_unlock_ability stays 0
 

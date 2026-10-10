@@ -55,7 +55,7 @@ import java.nio.charset.StandardCharsets;
  * release's ota.json and installs its payload with update_engine, which streams it from
  * GitHub into the inactive slot. ro.xp8.release (system) names the installed release;
  * ro.vendor.xp8.layout (vendor) must reach the payload's min_vendor_layout, else the
- * release needs a PC update.
+ * release needs a PC update. Layout 3 also means flash.sh prepared slot b's firmware.
  */
 public class MainActivity extends Activity {
     static final String OTA_JSON =
@@ -268,9 +268,13 @@ public class MainActivity extends Activity {
             show("Your system is up to date", details(), -1, "Check for update", v -> check());
         } else if (layout < need) {
             show("Update needs a computer", details() + "\n\n" + tag
-                    + " needs vendor layout " + need + ", this phone has " + layout
-                    + ". Update from a computer once (install guide, "
-                    + "\"Update to a newer release\"); later updates install here again.",
+                    + " needs vendor layout " + need + ", this phone has " + layout + "."
+                    + (layout < 3 ? " Slot b, where updates are installed, may still have the stock"
+                            + " bootloader and firmware; after an update there the lock screen"
+                            + " can reject your PIN." : "")
+                    + " Update from a computer once (install guide, "
+                    + "\"Update to a newer release\"); this also prepares slot b, and later"
+                    + " updates install here again.",
                     -1, "Check for update", v -> check());
         } else {
             show("System update available", details() + "\n\nYour device will be updated to " + tag

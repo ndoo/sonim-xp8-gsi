@@ -2,10 +2,11 @@
 # SPDX-FileCopyrightText: 2026 Andrew Yong
 # SPDX-License-Identifier: MIT
 #
-# Prepare slot b for A/B updates, once, over fastboot: write the userdebug ABL
-# to abl_b, and copy mdtpsecapp and modem from slot a (taken from your backup)
+# Prepare slot b for A/B updates over fastboot: write the userdebug ABL to
+# abl_b, and copy mdtpsecapp and modem from slot a (taken from your backup)
 # to mdtpsecapp_b and modem_b. Every other slot-b firmware partition already
 # equals slot a on the supported stock build. User data is not touched.
+# scripts/flash.sh does the same writes; this script needs no GSI images.
 #
 # usage: SERIAL=... scripts/enable-ab.sh --abl abl.elf [--dry-run] [--yes] BACKUP_DIR
 #   --abl FILE   abl.elf from the AT&T userdebug image (the one scripts/unlock.sh wrote)
@@ -34,29 +35,14 @@ if [ -z "$ABL" ] || [ -z "$BACKUP" ]; then usage; fi
 
 need_tools zstd awk
 [ $DRY = 1 ] || { require_serial; need_tools adb fastboot; }
-[ -f "$ABL" ] || die "no such file: $ABL"
-[ "$(sha256 "$ABL")" = "$ABL_SHA256" ] || die "$ABL has the wrong SHA-256; expected $ABL_SHA256"
 BACKUP=$(cd "$BACKUP" && pwd)
-[ -f "$BACKUP/SHA256SUMS" ] || die "$BACKUP/SHA256SUMS missing"
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/xp8-enable-ab.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
-
-PADDED=$WORK/abl_padded.img
-{ cat "$ABL"; head -c $((1048576 - $(fsize "$ABL"))) /dev/zero; } > "$PADDED"
-[ "$(sha256 "$PADDED")" = "$ABL_PADDED_SHA256" ] || die "padded ABL has an unexpected SHA-256"
-backup_image mdtpsecapp_a
-MDTP=$IMG
-backup_image modem_a
-MODEM=$IMG
-if [ "$(sha256 "$MDTP")" != "$MDTPSECAPP_A_SHA256" ] || [ "$(sha256 "$MODEM")" != "$MODEM_A_SHA256" ]; then
-    die "mdtpsecapp_a or modem_a in $BACKUP is not from the supported build $SUPPORTED_BUILD_ID; stop"
-fi
+slot_b_inputs "$ABL"
 
 plan="About to write to ${SERIAL:-the phone} over fastboot:
-  abl_b         userdebug ABL, zero-padded to 1 MiB (the image abl_a holds)
-  mdtpsecapp_b  mdtpsecapp_a from $BACKUP
-  modem_b       modem_a from $BACKUP
+$SLOTB_PLAN
 Slot a, userdata and the NV partitions are not written. The active slot stays a."
 if [ $DRY = 1 ]; then
     echo "$plan"
@@ -70,13 +56,8 @@ to_fastboot
 [ "$(fb_var current-slot)" = a ] || die "current slot is not a; run this from slot a"
 confirm write "$plan"
 
-flash_settle abl_b "$PADDED"
-flash_settle mdtpsecapp_b "$MDTP"
-flash_settle modem_b "$MODEM"
-[ "$(fb_var current-slot)" = a ] || die "current slot changed; stop"
+slot_b_write
 
 cat <<EOF
-$PROG: slot b firmware is ready. Next, write the GSI to slot b and switch:
-  SERIAL=$SERIAL scripts/flash.sh --slot b --activate
-To go back to slot a: SERIAL=$SERIAL scripts/flash.sh --switch a
+$PROG: slot b firmware is ready. Reboot with: fastboot -s $SERIAL reboot
 EOF

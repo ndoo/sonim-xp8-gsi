@@ -67,11 +67,12 @@ between builds. Signing uses the public AOSP test keys, file and filesystem
 times come from `SOURCE_DATE_EPOCH` (default `1750118400`), and the
 tethering APEX's hashtree salt is the SHA-256 of its payload.
 
-To install a build on a phone that keeps its data (`flash.sh --only system`
-or an OTA), give each build its own `XP8_RELEASE`
-(`-e XP8_RELEASE=dev-2`). Android rereads changed system apps and applies
-new default permissions only when `ro.build.version.incremental` changes,
-and the build appends `XP8_RELEASE` to it.
+To install a build on a phone that keeps its data
+(`flash.sh --backup "$BACKUP" --only system` or an OTA), give each build
+its own `XP8_RELEASE` (`-e XP8_RELEASE=dev-2`). Android rereads changed
+system apps and applies new default permissions only when
+`ro.build.version.incremental` changes, and the build appends
+`XP8_RELEASE` to it.
 
 To sign the tethering APEX with your own key, set `APEX_KEY` to an RSA-4096
 private key in PEM format, inside the container (`-e APEX_KEY=/src/my.pem`
