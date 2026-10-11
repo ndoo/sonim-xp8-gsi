@@ -6,10 +6,15 @@ package sg.ndoo.xp8.buttons;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Insets;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.preference.ListPreference;
 import android.preference.Preference;
@@ -20,6 +25,10 @@ import android.provider.Settings;
 import android.text.InputType;
 import android.view.MenuItem;
 import android.view.WindowInsets;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.TextView;
 import android.widget.EditText;
 
 import java.io.File;
@@ -34,8 +43,9 @@ import java.util.Properties;
  * the side-key daemon (vendor/keys/Xp8Keys.java) reads it on every key press.
  *
  * Per key (ptt, camera, sos; shown with Sonim's names PTT, YELLOW and ALARM):
- *   KEY.forward  "" (off), "*" (every push-to-talk app) or a package: press and
- *                release go to that app as on stock (Sonim, Kodiak or MCPTT intents)
+ *   KEY.forward  "" (off), "auto" (the app Sonim's AppKey policy picks; "*" from older
+ *                versions means the same) or a package: press and release go to that
+ *                one app as on stock (Sonim, Kodiak or MCPTT intents)
  *   KEY.short    action on a short press, when not forwarding
  *   KEY.long     action on a press as long as Android's touch & hold delay
  *                (Accessibility; 0.4 s by default), when not forwarding
@@ -77,11 +87,12 @@ public class MainActivity extends Activity {
         }
         super.onCreate(saved);
         getActionBar().setDisplayHomeAsUpEnabled(true);
-        findViewById(android.R.id.content).setOnApplyWindowInsetsListener((v, in) -> {
-            Insets b = in.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-            v.setPadding(b.left, b.top, b.right, b.bottom);
-            return WindowInsets.CONSUMED;
-        });
+        if (Build.VERSION.SDK_INT >= 30)                        // edge-to-edge from Android 15 on
+            findViewById(android.R.id.content).setOnApplyWindowInsetsListener((v, in) -> {
+                Insets b = in.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                v.setPadding(b.left, b.top, b.right, b.bottom);
+                return WindowInsets.CONSUMED;
+            });
         if (saved == null)
             getFragmentManager().beginTransaction().replace(android.R.id.content, new KeysFragment()).commit();
     }
@@ -96,8 +107,8 @@ public class MainActivity extends Activity {
     }
 
     void defaults() {
-        config.setProperty("ptt.forward", "*");
-        config.setProperty("sos.forward", "*");
+        config.setProperty("ptt.forward", "auto");
+        config.setProperty("sos.forward", "auto");
         config.setProperty("camera.forward", "");
         config.setProperty("camera.short", "camera");
     }
@@ -118,8 +129,11 @@ public class MainActivity extends Activity {
             cat.setTitle(TITLES[i]);
             screen.addPreference(cat);
             String fwd = config.getProperty(key + ".forward", "");
-            cat.addPreference(pref("Send to push-to-talk app", forwardLabel(fwd), () -> chooseForward(key)));
-            if (!fwd.isEmpty()) cat.addPreference(hold(key));
+            Preference app = pref("Select " + keyName(key) + " Key app", assignment(key), () -> chooseApp(key));
+            String pkg = assignedPackage(key);
+            if (pkg != null) app.setIcon(appIcon(pkg));
+            cat.addPreference(app);
+            if (key.equals("ptt")) cat.addPreference(hold(key));
             boolean on = fwd.isEmpty();
             String off = "Off while this key sends to a push-to-talk app";
             Preference s = pref("Short press", on ? actionLabel(config.getProperty(key + ".short", "none")) : off,
@@ -137,6 +151,19 @@ public class MainActivity extends Activity {
                 .putExtra(":settings:fragment_args_key", "tap_assistance_preference_screen"))));
     }
 
+    // What the key does now, in the words of stock's "Select ... Key app" summaries.
+    String assignment(String key) {
+        String fwd = config.getProperty(key + ".forward", "");
+        if (fwd.equals("*") || fwd.equals("auto")) {
+            String a = AppKeyPolicy.pick(this, pttApps(key), key.equals("sos") ? "sos" : "ptt");
+            return a == null ? "Automatic (no app)" : "Automatic (" + appLabel(a) + ")";
+        }
+        if (!fwd.isEmpty()) return pttApps(key).contains(fwd) ? appLabel(fwd) : appLabel(fwd) + " (not installed)";
+        String action = config.getProperty(key + ".short", "none");
+        return action.equals("none") ? "No Application" : action.equals("camera") ? "Camera"
+            : action.startsWith("launch:") ? appLabel(action.substring(7, action.indexOf('/'))) : actionLabel(action);
+    }
+
     String longPressLabel() {
         int ms = Settings.Secure.getInt(getContentResolver(), "long_press_timeout", 400);
         return ms == 400 ? "Short" : ms == 1000 ? "Medium" : ms == 1500 ? "Long" : ms + " ms";
@@ -148,8 +175,37 @@ public class MainActivity extends Activity {
         if (screen != null) render();
     }
 
+    // Titles wrap, as on stock, instead of being cut off.
+    static void wrap(View v) {
+        TextView t = (TextView) v.findViewById(android.R.id.title);
+        if (t != null) {
+            t.setSingleLine(false);
+            t.setMaxLines(3);
+        }
+    }
+
+    static final class Row extends Preference {
+        Row(Context c) { super(c); }
+
+        @Override
+        protected void onBindView(View v) {
+            super.onBindView(v);
+            wrap(v);
+        }
+    }
+
+    static final class HoldRow extends ListPreference {
+        HoldRow(Context c) { super(c); }
+
+        @Override
+        protected void onBindView(View v) {
+            super.onBindView(v);
+            wrap(v);
+        }
+    }
+
     Preference pref(String title, String summary, Runnable click) {
-        Preference p = new Preference(this);
+        Preference p = new Row(this);
         p.setPersistent(false);
         p.setTitle(title);
         p.setSummary(summary);
@@ -158,10 +214,10 @@ public class MainActivity extends Activity {
     }
 
     ListPreference hold(String key) {
-        ListPreference p = new ListPreference(this);
+        ListPreference p = new HoldRow(this);
         p.setPersistent(false);
-        p.setTitle("Press and hold to engage");
-        p.setDialogTitle("Press and hold to engage");
+        p.setTitle("Select Press and Hold timer to engage PTT Key");
+        p.setDialogTitle("Select Press and Hold timer to engage PTT Key");
         p.setEntries(HOLD_LABELS);
         p.setEntryValues(HOLD_VALUES);
         String ms = config.getProperty(key + ".hold", "0");
@@ -171,6 +227,8 @@ public class MainActivity extends Activity {
             config.setProperty(key + ".hold", (String) v);
             save();
             p.setSummary(holdLabel((String) v));
+            if (!v.equals("0")) Notices.say(this, "Press and Hold only takes effect with the screen off, "
+                    + "or with the screen on and the PTT app in the background.");
             return true;
         });
         return p;
@@ -190,61 +248,129 @@ public class MainActivity extends Activity {
         return out;
     }
 
-    void chooseForward(String key) {
-        List<String> values = new ArrayList<>();
-        List<String> labels = new ArrayList<>();
-        values.add(""); labels.add("Off");
-        values.add("*"); labels.add("All push-to-talk apps");
-        for (String p : pttApps(key)) { values.add(p); labels.add(appLabel(p)); }
-        new AlertDialog.Builder(this).setTitle("Send to push-to-talk app")
-            .setItems(labels.toArray(new String[0]), (d, w) -> {
-                String cur = config.getProperty(key + ".forward", "");
-                if (key.equals("ptt") && values.get(w).isEmpty() && labels.size() > 2 && !cur.isEmpty()) {
-                    confirmPttOff(cur.equals("*") ? String.join(", ", labels.subList(2, labels.size())) : appLabel(cur));
-                    return;
+    static final class Entry {
+        final String value, label;
+        final Drawable icon;
+
+        Entry(String value, String label, Drawable icon) {
+            this.value = value;
+            this.label = label;
+            this.icon = icon;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    // Like stock: "No Application", then every launchable app by name, with its icon. Apps that take the
+    // key as a push-to-talk button get it as before; any other app opens when the key is pressed.
+    void chooseApp(String key) {
+        PackageManager pm = getPackageManager();
+        List<String> ptt = pttApps(key);
+        List<Entry> apps = new ArrayList<>();
+        List<String> seen = new ArrayList<>();
+        for (ResolveInfo r : pm.queryIntentActivities(
+                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)) {
+            String pkg = r.activityInfo.packageName;
+            if (pkg.equals(getPackageName()) || seen.contains(pkg)) continue;
+            seen.add(pkg);
+            apps.add(new Entry(ptt.contains(pkg) ? pkg : "launch:" + pkg + "/" + r.activityInfo.name,
+                    r.loadLabel(pm).toString(), r.loadIcon(pm)));
+        }
+        for (String pkg : ptt)                                  // takes the key but has no launcher icon
+            if (!seen.contains(pkg)) apps.add(new Entry(pkg, appLabel(pkg), appIcon(pkg)));
+        apps.sort((a, b) -> a.label.compareToIgnoreCase(b.label));
+        List<Entry> entries = new ArrayList<>();
+        entries.add(new Entry("", "No Application", null));
+        if (!key.equals("camera")) entries.add(new Entry("auto", "Automatic", null));
+        entries.addAll(apps);
+        new AlertDialog.Builder(this).setTitle("Select " + keyName(key) + " Key app")
+            .setAdapter(iconAdapter(entries), (d, w) -> {
+                String v = entries.get(w).value;
+                if (v.startsWith("launch:")) {
+                    config.setProperty(key + ".forward", "");
+                    config.setProperty(key + ".short", v);
+                } else {
+                    config.setProperty(key + ".forward", v);
+                    if (v.isEmpty()) {
+                        config.setProperty(key + ".short", "none");
+                        config.setProperty(key + ".long", "none");
+                    }
                 }
-                setForward(key, values.get(w));
+                save();
+                render();
+                String pkg = v.startsWith("launch:") ? v.substring(7, v.indexOf('/')) : v;
+                Notices.toast(this, keyName(key), v.equals("auto") ? null : pkg);
             }).show();
     }
 
-    // Adapted from stock's prog_keys_change_pttkey_function warning.
-    void confirmPttOff(String apps) {
-        new AlertDialog.Builder(this)
-            .setMessage(apps + " will no longer get the PTT key, so you can't talk in push-to-talk calls "
-                + "with it. Turn it off?")
-            .setPositiveButton("Turn off", (d, w) -> setForward("ptt", ""))
-            .setNegativeButton("Cancel", null).show();
+    // A list of names, each with its icon when it has one.
+    ArrayAdapter<Entry> iconAdapter(List<Entry> entries) {
+        int size = dp(40);
+        return new ArrayAdapter<Entry>(this, android.R.layout.select_dialog_item, entries) {
+            @Override
+            public View getView(int position, View convert, ViewGroup parent) {
+                TextView t = (TextView) super.getView(position, convert, parent);
+                Drawable d = getItem(position).icon;
+                d = d != null ? d : new ColorDrawable(Color.TRANSPARENT);     // keeps the names aligned
+                d.setBounds(0, 0, size, size);
+                t.setCompoundDrawables(d, null, null, null);
+                t.setCompoundDrawablePadding(dp(16));
+                return t;
+            }
+        };
     }
 
-    void setForward(String key, String value) {
-        config.setProperty(key + ".forward", value);
-        save();
-        render();
+    int dp(int v) {
+        return (int) (v * getResources().getDisplayMetrics().density);
+    }
+
+    Drawable appIcon(String pkg) {
+        try {
+            return getPackageManager().getApplicationIcon(pkg);
+        } catch (PackageManager.NameNotFoundException e) {
+            return null;
+        }
+    }
+
+    // The package the key's row shows an icon for, or null.
+    String assignedPackage(String key) {
+        String fwd = config.getProperty(key + ".forward", "");
+        if (fwd.equals("*") || fwd.equals("auto")) return AppKeyPolicy.pick(this, pttApps(key), key.equals("sos") ? "sos" : "ptt");
+        if (!fwd.isEmpty()) return fwd;
+        String action = config.getProperty(key + ".short", "none");
+        return action.startsWith("launch:") ? action.substring(7, action.indexOf('/')) : null;
+    }
+
+    String keyName(String key) {
+        return key.equals("ptt") ? "PTT" : key.equals("sos") ? "ALARM" : "YELLOW";
     }
 
     void chooseAction(String key, String press) {
-        List<String> values = new ArrayList<>();
-        List<String> labels = new ArrayList<>();
-        values.add("none"); labels.add("Nothing");
-        values.add("torch"); labels.add("Flashlight on/off");
-        values.add("camera"); labels.add("Open camera");
-        values.add("call:"); labels.add("Call a number…");
-        values.add("assist"); labels.add("Voice assistant");
-        values.add("playpause"); labels.add("Play / pause media");
-        values.add("dnd"); labels.add("Do Not Disturb on/off");
-        Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-        List<ResolveInfo> apps = getPackageManager().queryIntentActivities(launcher, 0);
         PackageManager pm = getPackageManager();
+        List<Entry> entries = new ArrayList<>();
+        entries.add(new Entry("none", "Nothing", null));
+        entries.add(new Entry("torch", "Flashlight on/off", null));
+        entries.add(new Entry("camera", "Open camera", null));
+        entries.add(new Entry("call:", "Call a number…", null));
+        entries.add(new Entry("assist", "Voice assistant", null));
+        entries.add(new Entry("playpause", "Play / pause media", null));
+        entries.add(new Entry("dnd", "Do Not Disturb on/off", null));
+        List<ResolveInfo> apps = pm.queryIntentActivities(
+            new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0);
         apps.sort((a, b) -> a.loadLabel(pm).toString().compareToIgnoreCase(b.loadLabel(pm).toString()));
         for (ResolveInfo r : apps) {
             if (r.activityInfo.packageName.equals(getPackageName())) continue;
-            values.add("launch:" + r.activityInfo.packageName + "/" + r.activityInfo.name);
-            labels.add("Open " + r.loadLabel(pm));
+            entries.add(new Entry("launch:" + r.activityInfo.packageName + "/" + r.activityInfo.name,
+                    "Open " + r.loadLabel(pm), r.loadIcon(pm)));
         }
         new AlertDialog.Builder(this).setTitle(press.equals("short") ? "Short press" : "Long press")
-            .setItems(labels.toArray(new String[0]), (d, w) -> {
-                if (values.get(w).equals("call:")) { askNumber(key, press); return; }
-                config.setProperty(key + "." + press, values.get(w));
+            .setAdapter(iconAdapter(entries), (d, w) -> {
+                String v = entries.get(w).value;
+                if (v.equals("call:")) { askNumber(key, press); return; }
+                config.setProperty(key + "." + press, v);
                 save();
                 render();
             }).show();
@@ -275,10 +401,6 @@ public class MainActivity extends Activity {
     String holdLabel(String ms) {
         for (int i = 0; i < HOLD_VALUES.length; i++) if (HOLD_VALUES[i].equals(ms)) return HOLD_LABELS[i];
         return ms + " ms";
-    }
-
-    String forwardLabel(String fwd) {
-        return fwd.isEmpty() ? "Off" : fwd.equals("*") ? "All push-to-talk apps" : appLabel(fwd);
     }
 
     String actionLabel(String action) {
