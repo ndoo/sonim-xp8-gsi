@@ -1,4 +1,10 @@
 # The speaker-safe paths enable the speaker instead of the default device.
+# amic1 (handset-mic, speaker-mic, voice-rec-mic, camcorder-mic: what apps get
+# with AUDIO_SOURCE_MIC, Zello among them) lowers its decimator DEC6 from 84
+# to 76 (-8 dB): at the stock gain a voice at push-to-talk distance drives the
+# TX limiter (-2 dBFS). It is set in the path, not in the defaults, so the
+# multi-mic paths that also use DEC6 (three-mic for calls, quad-mic,
+# voice-speaker-qmic) keep 84. See docs/technical.md#vendor-image.
 --- a/etc/mixer_paths_tavil.xml
 +++ b/etc/mixer_paths_tavil.xml
 @@ -616,7 +616,7 @@
@@ -37,3 +43,11 @@
      </path>
  
      <path name="compress-offload-playback hdmi">
+@@ -2278,6 +2278,7 @@
+         <ctl name="ADC MUX6" value="AMIC" />
+         <ctl name="AMIC MUX6" value="ADC1" />
+         <ctl name="IIR0 INP0 MUX" value="DEC6" />
++        <ctl name="DEC6 Volume" value="76" />
+     </path>
+ 
+     <path name="amic2">
