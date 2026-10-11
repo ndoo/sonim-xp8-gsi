@@ -53,6 +53,14 @@
             <meta-data android:name="com.android.settings.summary" android:value="PTT, YELLOW and ALARM keys" />
             <meta-data android:name="com.android.settings.icon" android:resource="@drawable/ic_programmable_keys" />
         </activity>
+        <!-- Sent by the daemon (root) when a key's app changes or a key has no app. -->
+        <receiver
+            android:name=".NoticeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="sg.ndoo.xp8.buttons.NOTICE" />
+            </intent-filter>
+        </receiver>
         <!-- Sent by the daemon (root) for the "Flashlight on/off" action. -->
         <receiver
             android:name=".TorchReceiver"

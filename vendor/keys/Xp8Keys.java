@@ -21,9 +21,15 @@
 // While a key forwards PTT, the stock audio HAL's PTT profile is on
 // (ptt_call_state=on), as Sonim's com.kodiak.pttExtensions set it.
 // A PTT press turns the screen on, as stock's PhoneWindowManager.wakePTTKeyEvent did.
-// As there, a push-to-talk app in front of an unlocked, lit screen gets the key itself
-// (keycode 228) instead of an intent, with no hold time, and the headset PTT button
-// answers or ends a phone call (KEYCODE_HEADSETHOOK).
+// As there, the hold time does not apply to a push-to-talk app in front of an unlocked, lit
+// screen, and the headset PTT button answers or ends a phone call (KEYCODE_HEADSETHOOK).
+//
+// Like Sonim's AppKey policy, a key goes to one app: the one chosen in XP8 Buttons, or by
+// default the app the policy picks. Apps claim a key with app_key_ptt_* (or app_key_sos_*)
+// meta-data; the highest app_key_*_priority wins, then the earliest install (stock queries
+// "priority DESC"); with no claimant, the earliest installed push-to-talk app. When that app
+// changes (a new install, or the chosen app is uninstalled), or a key has no app, XP8 Buttons
+// shows a toast.
 //
 // The XP8 Buttons app (vendor/keys/app) writes the choices to CONFIG; keys it has
 // not set keep the defaults below. Started by vendor/xp8-gsi.rc as root.
@@ -32,6 +38,8 @@
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.KeyEvent;
@@ -47,10 +55,14 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
@@ -76,6 +88,13 @@ public class Xp8Keys {
     static final ScheduledExecutorService TIMER = Executors.newSingleThreadScheduledExecutor();
     static volatile Map<String, Target> pttTargets = Collections.emptyMap();
     static volatile Map<String, List<String>> sosTargets = Collections.emptyMap();
+    static final String APP = "sg.ndoo.xp8.buttons", NOTICE = APP + ".NOTICE", AUTO = "auto";
+    static volatile String pttAuto, sosAuto;      // the app "auto" resolves to; null = none
+    static boolean autoKnown;                      // pttAuto and sosAuto have been computed once
+    static long noticedAt;                         // last "no app" toast, so a held key shows one
+    static Object pm;
+    static Method getPackageInfo;
+    static boolean longFlags;
     static String targetsShown;
     static Object am, power, atm, wm, audio;
     static Method broadcastIntent, startService, setParameters, wakeUp;
@@ -110,8 +129,8 @@ public class Xp8Keys {
 
     static Properties defaults() {
         Properties d = new Properties();
-        d.setProperty("ptt.forward", "*");          // * = every push-to-talk app
-        d.setProperty("sos.forward", "*");
+        d.setProperty("ptt.forward", AUTO);         // AUTO, or a package; "*" from older versions means AUTO
+        d.setProperty("sos.forward", AUTO);
         d.setProperty("camera.forward", "");
         d.setProperty("camera.short", "camera");
         return d;
@@ -212,6 +231,116 @@ public class Xp8Keys {
         targetsShown = shown;
         pttTargets = ptt;
         sosTargets = sos;
+        List<String> sosPkgs = new ArrayList<>();
+        for (List<String> l : sos.values()) for (String p : l) if (!sosPkgs.contains(p)) sosPkgs.add(p);
+        String ptta = pick(ptt.keySet(), "ptt"), sosa = pick(sosPkgs, "sos");
+        if (autoKnown) {
+            if (!Objects.equals(ptta, pttAuto)) autoChanged("ptt", ptta);
+            if (!Objects.equals(sosa, sosAuto)) autoChanged("sos", sosa);
+        }
+        gone("ptt", ptt.keySet(), ptta);
+        gone("sos", sosPkgs, sosa);
+        if (!Objects.equals(ptta, pttAuto) || !Objects.equals(sosa, sosAuto))
+            log("auto: ptt " + ptta + ", sos " + sosa);
+        pttAuto = ptta;
+        sosAuto = sosa;
+        autoKnown = true;
+    }
+
+    static void initPackageManager() throws Exception {
+        pm = Class.forName("android.app.ActivityThread").getMethod("getPackageManager").invoke(null);
+        Class<?> ipm = Class.forName("android.content.pm.IPackageManager");
+        try {
+            getPackageInfo = ipm.getMethod("getPackageInfo", String.class, long.class, int.class);   // Android 13 and later
+            longFlags = true;
+        } catch (NoSuchMethodException e) {
+            getPackageInfo = ipm.getMethod("getPackageInfo", String.class, int.class, int.class);
+        }
+    }
+
+    static int priority(Bundle m, String key) {
+        Object o = m.get(key);
+        try {
+            return o instanceof Number ? ((Number) o).intValue() : o instanceof String ? Integer.parseInt((String) o) : 0;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    // AppKey policy: claimants first, then the highest priority, then the earliest install.
+    static String pick(Collection<String> pkgs, String key) {
+        String best = null;
+        boolean bestClaim = false;
+        int bestPrio = 0;
+        long bestTime = 0;
+        for (String p : pkgs) {
+            boolean claim = false;
+            int prio = 0;
+            long time = Long.MAX_VALUE;
+            try {
+                Object flags = longFlags ? (Object) (long) PackageManager.GET_META_DATA : (Object) PackageManager.GET_META_DATA;
+                PackageInfo i = (PackageInfo) getPackageInfo.invoke(pm, p, flags, 0);
+                if (i == null) continue;                        // not installed
+                time = i.firstInstallTime;
+                Bundle m = i.applicationInfo != null ? i.applicationInfo.metaData : null;
+                if (m != null) {
+                    claim = m.containsKey("app_key_" + key + "_intent") || m.containsKey("app_key_" + key + "_priority")
+                            || m.containsKey("app_key_" + key + "_data");
+                    prio = priority(m, "app_key_" + key + "_priority");
+                }
+            } catch (Exception e) {
+                log("package info " + p + ": " + e);
+            }
+            boolean better = best == null || (claim != bestClaim ? claim : prio != bestPrio ? prio > bestPrio
+                    : time != bestTime ? time < bestTime : p.compareTo(best) < 0);
+            if (better) {
+                best = p;
+                bestClaim = claim;
+                bestPrio = prio;
+                bestTime = time;
+            }
+        }
+        return best;
+    }
+
+    // The app a key goes to: its own choice while that app is installed, else what the policy picks.
+    static String target(String name, String fwd) {
+        if (fwd.isEmpty()) return null;
+        boolean sos = name.equals("sos");
+        String auto = sos ? sosAuto : pttAuto;
+        if (fwd.equals("*") || fwd.equals(AUTO)) return auto;
+        boolean installed = sos ? sosTargets.values().stream().anyMatch(l -> l.contains(fwd)) : pttTargets.containsKey(fwd);
+        return installed ? fwd : auto;
+    }
+
+    // XP8 Buttons shows the toast; PKG empty means no app.
+    static void notice(String name, String pkg) {
+        send(new Intent(NOTICE).setPackage(APP).addFlags(FLAGS).putExtra("key", name).putExtra("pkg", pkg == null ? "" : pkg));
+    }
+
+    static final Set<String> missing = new HashSet<>();    // keys whose chosen app is not installed
+
+    // A key's chosen app was uninstalled: it falls back to the policy's pick, and says so once.
+    static void gone(String name, Collection<String> installed, String auto) {
+        String fwd = config().getProperty(name + ".forward", "");
+        boolean explicit = !fwd.isEmpty() && !fwd.equals(AUTO) && !fwd.equals("*");
+        if (explicit && !installed.contains(fwd)) {
+            if (missing.add(name)) {
+                log(name + " key app " + fwd + " is gone, now " + auto);
+                notice(name, auto);
+            }
+        } else {
+            missing.remove(name);
+        }
+    }
+
+    // The policy picked another app. Only a key left on automatic follows it.
+    static void autoChanged(String name, String pkg) {
+        String fwd = config().getProperty(name + ".forward", "");
+        if (fwd.equals(AUTO) || fwd.equals("*")) {
+            log(name + " key app is now " + pkg);
+            notice(name, pkg);
+        }
     }
 
     static void initActivityManager() throws Exception {
@@ -299,33 +428,24 @@ public class Xp8Keys {
         });
     }
 
-    // TARGET is a package, or * for every push-to-talk app.
-    static void ptt(boolean down, String target, String front) {
+    // PKG is the one app the key goes to. As on stock, it gets the intent also while it is in front.
+    static void ptt(boolean down, String pkg) {
         KeyEvent ev = new KeyEvent(down ? KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP, KEYCODE_PTT);
-        Map<String, Target> all = pttTargets;
-        List<String> pkgs = target.equals("*") ? new ArrayList<>(all.keySet()) : Collections.singletonList(target);
-        for (String pkg : pkgs) {
-            if (pkg.equals(front)) continue;                    // it gets keycode 228 itself
-            Target t = all.getOrDefault(pkg, new Target(SONIM_PTT, null));
-            String action = t.action.equals(SONIM_PTT) ? SONIM + (down ? "PTT_KEY_DOWN" : "PTT_KEY_UP") : t.action;
-            Intent it = new Intent(action).putExtra(Intent.EXTRA_KEY_EVENT, ev);
-            if (t.service != null) send(it.setComponent(new ComponentName(pkg, t.service)));
-            else send(it.setPackage(pkg).addFlags(FLAGS));
-        }
+        Target t = pttTargets.getOrDefault(pkg, new Target(SONIM_PTT, null));
+        String action = t.action.equals(SONIM_PTT) ? SONIM + (down ? "PTT_KEY_DOWN" : "PTT_KEY_UP") : t.action;
+        Intent it = new Intent(action).putExtra(Intent.EXTRA_KEY_EVENT, ev);
+        if (t.service != null) send(it.setComponent(new ComponentName(pkg, t.service)));
+        else send(it.setPackage(pkg).addFlags(FLAGS));
     }
 
-    static void sos(boolean down, String target, KeyEvent ev) {
+    static void sos(boolean down, String pkg, KeyEvent ev) {
         Map<String, List<String>> all = sosTargets;
         for (String a : new String[] {SONIM_SOS, KODIAK_SOS}) {
-            List<String> pkgs = target.equals("*")
-                    ? all.getOrDefault(a, Collections.emptyList())
-                    : Collections.singletonList(target);
-            for (String pkg : pkgs) {
-                Intent it = a.equals(SONIM_SOS)
-                        ? new Intent(SONIM + (down ? "SOS_KEY_DOWN" : "SOS_KEY_UP"))
-                        : new Intent(KODIAK_SOS).putExtra(Intent.EXTRA_KEY_EVENT, ev);
-                send(it.setPackage(pkg).addFlags(FLAGS));
-            }
+            if (!all.getOrDefault(a, Collections.emptyList()).contains(pkg)) continue;
+            Intent it = a.equals(SONIM_SOS)
+                    ? new Intent(SONIM + (down ? "SOS_KEY_DOWN" : "SOS_KEY_UP"))
+                    : new Intent(KODIAK_SOS).putExtra(Intent.EXTRA_KEY_EVENT, ev);
+            send(it.setPackage(pkg).addFlags(FLAGS));
         }
     }
 
@@ -410,10 +530,20 @@ public class Xp8Keys {
                 return;
             }
             String fwd = c.getProperty(name + ".forward", "");
-            if (!fwd.isEmpty()) {
+            String app = target(name, fwd);
+            if (!fwd.isEmpty() && app == null) {
+                k.forward = "";                                  // nothing to send; the release does nothing either
+                k.sentDown = false;
+                long now = SystemClock.uptimeMillis();
+                if (now - noticedAt > 1000) {
+                    noticedAt = now;
+                    notice(name, null);
+                }
+                log(name + " down: no app");
+            } else if (!fwd.isEmpty()) {
                 // KEY.hold: hold this long (ms) before the press is forwarded, as Sonim's
                 // "Press and Hold timer to engage PTT Key"; a shorter press sends nothing.
-                k.forward = fwd;
+                k.forward = app;
                 k.sentDown = false;
                 long hold = 0;
                 try {
@@ -421,26 +551,41 @@ public class Xp8Keys {
                 } catch (NumberFormatException e) {
                     log("bad " + name + ".hold");
                 }
-                if (front != null && !(fwd.equals("*") ? pttTargets.containsKey(front) : fwd.equals(front)))
-                    front = null;
-                if (front != null) hold = 0;
+                if (front != null && front.equals(app)) hold = 0;   // stock: no hold with the app in front
                 k.front = front;
                 Runnable press = () -> {
                     if (name.equals("sos")) {
-                        sos(true, fwd, k.event(KeyEvent.ACTION_DOWN));
+                        sos(true, app, k.event(KeyEvent.ACTION_DOWN));
                     } else {
                         releasedAt = 0;
                         hal(PTT_ON);
-                        ptt(true, fwd, k.front);
+                        ptt(true, app);
                     }
                     k.sentDown = true;
-                    log(name + " down -> " + fwd + (k.front != null ? ", " + k.front + " in front" : ""));
+                    log(name + " down -> " + app + (k.front != null ? ", " + k.front + " in front" : ""));
                 };
                 if (hold > 0) k.holdTimer = TIMER.schedule(press, hold, TimeUnit.MILLISECONDS);
                 else press.run();
             } else {
                 k.longDone = false;
                 String longAction = c.getProperty(name + ".long", "none");
+                String shortAction = c.getProperty(name + ".short", "none");
+                if (!name.equals("camera") && shortAction.startsWith("launch:")
+                        && (longAction.isEmpty() || longAction.equals("none"))) {
+                    // Stock opens an app that is not a push-to-talk app when the key is pressed,
+                    // after the hold time unless that app is in front already.
+                    k.longDone = true;
+                    long hold = 0;
+                    try {
+                        hold = Long.parseLong(c.getProperty(name + ".hold", "0"));
+                    } catch (NumberFormatException e) {
+                        log("bad " + name + ".hold");
+                    }
+                    String pkg = shortAction.substring(7, Math.max(7, shortAction.indexOf('/')));
+                    if (pkg.equals(front)) hold = 0;
+                    if (hold > 0) k.holdTimer = TIMER.schedule(() -> run(shortAction), hold, TimeUnit.MILLISECONDS);
+                    else run(shortAction);
+                }
                 if (!longAction.isEmpty() && !longAction.equals("none"))
                     k.longPress = TIMER.schedule(() -> {
                         k.longDone = true;
@@ -463,7 +608,7 @@ public class Xp8Keys {
                     if (name.equals("sos")) {
                         sos(false, k.forward, k.event(KeyEvent.ACTION_UP));
                     } else {
-                        ptt(false, k.forward, k.front);
+                        ptt(false, k.forward);
                         releasedAt = System.currentTimeMillis();
                     }
                     log(name + " up -> " + k.forward);
@@ -474,6 +619,8 @@ public class Xp8Keys {
             } else {
                 if (k.longPress != null) k.longPress.cancel(false);
                 k.longPress = null;
+                if (k.holdTimer != null) k.holdTimer.cancel(false);     // released before the hold time
+                k.holdTimer = null;
                 if (!k.longDone) run(c.getProperty(name + ".short", "none"));
             }
         }
@@ -501,6 +648,11 @@ public class Xp8Keys {
             log("no power manager: " + e);
         }
         initState();
+        try {
+            initPackageManager();
+        } catch (Exception e) {
+            log("no package manager: " + e);
+        }
         hal(PTT_OFF);
         refreshTargets();
         log("watching " + keys + (headset != null ? " and " + headset : ""));
