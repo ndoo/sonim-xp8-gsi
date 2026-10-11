@@ -20,6 +20,10 @@
 // SOS_KEY_DOWN/UP and Kodiak's KEYCODE_SOS.
 // While a key forwards PTT, the stock audio HAL's PTT profile is on
 // (ptt_call_state=on), as Sonim's com.kodiak.pttExtensions set it.
+// A PTT press turns the screen on, as stock's PhoneWindowManager.wakePTTKeyEvent did.
+// As there, a push-to-talk app in front of an unlocked, lit screen gets the key itself
+// (keycode 228) instead of an intent, with no hold time, and the headset PTT button
+// answers or ends a phone call (KEYCODE_HEADSETHOOK).
 //
 // The XP8 Buttons app (vendor/keys/app) writes the choices to CONFIG; keys it has
 // not set keep the defaults below. Started by vendor/xp8-gsi.rc as root.
@@ -73,8 +77,8 @@ public class Xp8Keys {
     static volatile Map<String, Target> pttTargets = Collections.emptyMap();
     static volatile Map<String, List<String>> sosTargets = Collections.emptyMap();
     static String targetsShown;
-    static Object am;
-    static Method broadcastIntent, startService, setParameters;
+    static Object am, power, atm, wm, audio;
+    static Method broadcastIntent, startService, setParameters, wakeUp;
     static volatile long releasedAt;       // last PTT release; the HAL profile goes off 300 ms later
     static volatile long longPressMs = LONG_PRESS_DEFAULT;
     static volatile boolean readLongPress; // re-read long_press_timeout after a key release
@@ -221,6 +225,63 @@ public class Xp8Keys {
                 String.class, String.class, int.class);
     }
 
+    static void initPowerManager() throws Exception {
+        Object b = Class.forName("android.os.ServiceManager").getMethod("getService", String.class).invoke(null, "power");
+        power = Class.forName("android.os.IPowerManager$Stub").getMethod("asInterface", android.os.IBinder.class)
+                .invoke(null, b);
+        wakeUp = power.getClass().getMethod("wakeUp", long.class, int.class, String.class, String.class);
+    }
+
+    static Object service(String name, String stub) throws Exception {
+        Object b = Class.forName("android.os.ServiceManager").getMethod("getService", String.class).invoke(null, name);
+        return Class.forName(stub + "$Stub").getMethod("asInterface", android.os.IBinder.class).invoke(null, b);
+    }
+
+    static void initState() {
+        try {
+            atm = Class.forName("android.app.ActivityTaskManager").getMethod("getService").invoke(null);
+            wm = service("window", "android.view.IWindowManager");
+            audio = service("audio", "android.media.IAudioService");
+        } catch (Exception e) {
+            log("no window or audio state: " + e);
+        }
+    }
+
+    // The app in front, when the screen is on and unlocked; else null.
+    static String frontApp() {
+        try {
+            if (!(boolean) power.getClass().getMethod("isInteractive").invoke(power)) return null;
+            if ((boolean) wm.getClass().getMethod("isKeyguardLocked").invoke(wm)) return null;
+            Object task = atm.getClass().getMethod("getFocusedRootTaskInfo").invoke(atm);
+            ComponentName top = task == null ? null : (ComponentName) task.getClass().getField("topActivity").get(task);
+            return top == null ? null : top.getPackageName();
+        } catch (Exception e) {
+            log("front app: " + e);
+            return null;
+        }
+    }
+
+    // A cellular call ringing or in progress (audio mode RINGTONE or IN_CALL).
+    static boolean inCall() {
+        try {
+            int mode = (int) audio.getClass().getMethod("getMode").invoke(audio);
+            return mode == 1 || mode == 2;
+        } catch (Exception e) {
+            log("audio mode: " + e);
+            return false;
+        }
+    }
+
+    // The kernel wake lock keeps the phone from suspending until the screen is on.
+    static void wake() {
+        try {
+            Files.write(new File("/sys/power/wake_lock").toPath(), "xp8-keys 2000000000".getBytes());
+            wakeUp.invoke(power, SystemClock.uptimeMillis(), 6, "xp8-keys:PTT", "android"); // WAKE_REASON_WAKE_KEY
+        } catch (Exception e) {
+            log("wake failed: " + e);
+        }
+    }
+
     // Through IActivityManager directly: no am process start, so no added latency.
     static void send(Intent it) {
         SEND.execute(() -> {
@@ -239,11 +300,12 @@ public class Xp8Keys {
     }
 
     // TARGET is a package, or * for every push-to-talk app.
-    static void ptt(boolean down, String target) {
+    static void ptt(boolean down, String target, String front) {
         KeyEvent ev = new KeyEvent(down ? KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP, KEYCODE_PTT);
         Map<String, Target> all = pttTargets;
         List<String> pkgs = target.equals("*") ? new ArrayList<>(all.keySet()) : Collections.singletonList(target);
         for (String pkg : pkgs) {
+            if (pkg.equals(front)) continue;                    // it gets keycode 228 itself
             Target t = all.getOrDefault(pkg, new Target(SONIM_PTT, null));
             String action = t.action.equals(SONIM_PTT) ? SONIM + (down ? "PTT_KEY_DOWN" : "PTT_KEY_UP") : t.action;
             Intent it = new Intent(action).putExtra(Intent.EXTRA_KEY_EVENT, ev);
@@ -304,9 +366,9 @@ public class Xp8Keys {
     static final class Key {
         final String name;
         final int code;
-        boolean down, longDone, sentDown;
+        boolean down, longDone, sentDown, hook;
         long downTime;
-        String forward;                                          // set while forwarding a press
+        String forward, front;                                   // set while forwarding a press
         ScheduledFuture<?> longPress, holdTimer;
 
         Key(String name, int code) {
@@ -340,7 +402,13 @@ public class Xp8Keys {
         Properties c = config();
         if (value == 1 && !k.down) {
             k.down = true;
+            String front = name.equals("ptt") ? frontApp() : null;   // before the wake below
+            if (name.equals("ptt")) wake();
             k.downTime = SystemClock.uptimeMillis();
+            if (code == 249 && inCall()) {
+                k.hook = true;
+                return;
+            }
             String fwd = c.getProperty(name + ".forward", "");
             if (!fwd.isEmpty()) {
                 // KEY.hold: hold this long (ms) before the press is forwarded, as Sonim's
@@ -353,16 +421,20 @@ public class Xp8Keys {
                 } catch (NumberFormatException e) {
                     log("bad " + name + ".hold");
                 }
+                if (front != null && !(fwd.equals("*") ? pttTargets.containsKey(front) : fwd.equals(front)))
+                    front = null;
+                if (front != null) hold = 0;
+                k.front = front;
                 Runnable press = () -> {
                     if (name.equals("sos")) {
                         sos(true, fwd, k.event(KeyEvent.ACTION_DOWN));
                     } else {
                         releasedAt = 0;
                         hal(PTT_ON);
-                        ptt(true, fwd);
+                        ptt(true, fwd, k.front);
                     }
                     k.sentDown = true;
-                    log(name + " down -> " + fwd);
+                    log(name + " down -> " + fwd + (k.front != null ? ", " + k.front + " in front" : ""));
                 };
                 if (hold > 0) k.holdTimer = TIMER.schedule(press, hold, TimeUnit.MILLISECONDS);
                 else press.run();
@@ -378,6 +450,12 @@ public class Xp8Keys {
         } else if (value == 0 && k.down) {
             k.down = false;
             readLongPress = true;
+            if (k.hook) {
+                k.hook = false;
+                log("headset ptt in a call -> headsethook");
+                SEND.execute(() -> exec("input", "keyevent", "KEYCODE_HEADSETHOOK"));
+                return;
+            }
             if (k.forward != null) {
                 if (k.holdTimer != null) k.holdTimer.cancel(false);
                 k.holdTimer = null;
@@ -385,7 +463,7 @@ public class Xp8Keys {
                     if (name.equals("sos")) {
                         sos(false, k.forward, k.event(KeyEvent.ACTION_UP));
                     } else {
-                        ptt(false, k.forward);
+                        ptt(false, k.forward, k.front);
                         releasedAt = System.currentTimeMillis();
                     }
                     log(name + " up -> " + k.forward);
@@ -417,6 +495,12 @@ public class Xp8Keys {
         if (keys == null) throw new IllegalStateException("no gpio-keys input device");
         String headset = inputDevice("PTT-Headset-Button");
         initActivityManager();
+        try {
+            initPowerManager();
+        } catch (Exception e) {
+            log("no power manager: " + e);
+        }
+        initState();
         hal(PTT_OFF);
         refreshTargets();
         log("watching " + keys + (headset != null ? " and " + headset : ""));
