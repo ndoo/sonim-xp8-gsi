@@ -38,3 +38,9 @@ path = ["vendor/updater/res/drawable/ic_system_update.xml"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "Google LLC"
 SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = ["vendor/keys/app/res/drawable/ic_programmable_keys.xml"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Pictogrammers"
+SPDX-License-Identifier = "Apache-2.0"

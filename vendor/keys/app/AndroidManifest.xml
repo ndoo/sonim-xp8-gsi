@@ -3,8 +3,9 @@
      SPDX-FileCopyrightText: 2026 Andrew Yong
      SPDX-License-Identifier: MIT
 
-     XP8 Buttons: chooses what the XP8 side keys do. The side-key daemon
-     (vendor/keys/Xp8Keys.java) reads files/keys.properties and acts on it. -->
+     XP8 Buttons: the Settings > Programmable keys page that chooses what the
+     XP8 side keys do. The side-key daemon (vendor/keys/Xp8Keys.java) reads
+     files/keys.properties and acts on it. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="sg.ndoo.xp8.buttons">
 
@@ -31,17 +32,26 @@
     </queries>
 
     <application
-        android:label="XP8 Buttons"
-        android:icon="@android:drawable/ic_menu_preferences"
-        android:theme="@android:style/Theme.DeviceDefault.DayNight"
+        android:label="Programmable keys"
+        android:icon="@drawable/ic_programmable_keys"
+        android:theme="@android:style/Theme.DeviceDefault.Settings"
         android:allowBackup="false">
         <activity
             android:name=".MainActivity"
             android:exported="true">
+            <!-- A top-level Settings entry above System, where stock Android 10 had it. -->
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.android.settings.action.EXTRA_SETTINGS" />
             </intent-filter>
+            <meta-data android:name="com.android.settings.category"
+                android:value="com.android.settings.category.ia.homepage" />
+            <meta-data android:name="com.android.settings.group_key"
+                android:value="top_level_system_info_category" />
+            <meta-data android:name="com.android.settings.order" android:value="-25" />
+            <meta-data android:name="com.android.settings.keyhint" android:value="top_level_prog_key" />
+            <meta-data android:name="com.android.settings.title" android:value="Programmable keys" />
+            <meta-data android:name="com.android.settings.summary" android:value="PTT, YELLOW and ALARM keys" />
+            <meta-data android:name="com.android.settings.icon" android:resource="@drawable/ic_programmable_keys" />
         </activity>
         <!-- Sent by the daemon (root) for the "Flashlight on/off" action. -->
         <receiver

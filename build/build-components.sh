@@ -55,7 +55,9 @@ K=$W/keys && mkdir -p "$K/daemon" "$K/app"
 javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$K/daemon" "$SRC/keys/Xp8Keys.java"
 "${D8[@]}" --release --min-api 29 --lib "$ANDROID_JAR" --output "$K/daemon" "$K"/daemon/*.class
 cp "$K/daemon/classes.dex" "$C/xp8-keys.dex"
-"$AAPT2" link -o "$K/u.apk" --manifest "$SRC/keys/app/AndroidManifest.xml" -I "$ANDROID_JAR"     --min-sdk-version 29 --target-sdk-version 35 --version-code 1 --version-name 1.0
+"$AAPT2" compile --dir "$SRC/keys/app/res" -o "$K/res.zip"
+"$AAPT2" link -o "$K/u.apk" --manifest "$SRC/keys/app/AndroidManifest.xml" -I "$ANDROID_JAR" \
+    --min-sdk-version 29 --target-sdk-version 35 --version-code 2 --version-name 1.1 "$K/res.zip"
 mapfile -t java < <(find "$SRC/keys/app/src" -name '*.java' | sort)
 javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$K/app" "${java[@]}"
 mapfile -t classes < <(find "$K/app" -name '*.class' | sort)
