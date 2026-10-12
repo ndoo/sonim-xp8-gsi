@@ -18,8 +18,8 @@
 // the last of these it declares a receiver or service for, with the key event
 // (stock keycode 228) as android.intent.extra.KEY_EVENT. SOS goes out as Sonim's
 // SOS_KEY_DOWN/UP and Kodiak's KEYCODE_SOS.
-// While a key forwards PTT, the stock audio HAL's PTT profile is on
-// (ptt_call_state=on), as Sonim's com.kodiak.pttExtensions set it.
+// While a key forwards PTT to a Kodiak app, the stock audio HAL's PTT profile is on
+// (ptt_call_state=on), as Sonim's com.kodiak.pttExtensions set it; other apps get none, as on stock.
 // A PTT press turns the screen on, as stock's PhoneWindowManager.wakePTTKeyEvent did.
 // As there, the hold time does not apply to a push-to-talk app in front of an unlocked, lit
 // screen, and the headset PTT button answers or ends a phone call (KEYCODE_HEADSETHOOK).
@@ -449,6 +449,20 @@ public class Xp8Keys {
         }
     }
 
+    // debug.xp8.ptt_profile on|off overrides, for measurements.
+    static boolean profile(String pkg) {
+        try {
+            Object v = Class.forName("android.os.SystemProperties").getMethod("get", String.class, String.class)
+                    .invoke(null, "debug.xp8.ptt_profile", "");
+            if ("on".equals(v)) return true;
+            if ("off".equals(v)) return false;
+        } catch (Exception e) {
+            log("debug.xp8.ptt_profile: " + e);
+        }
+        Target t = pttTargets.get(pkg);
+        return t != null && KODIAK_PTT.equals(t.action);
+    }
+
     static void hal(String kv) {
         try {
             setParameters.invoke(null, kv);
@@ -558,7 +572,7 @@ public class Xp8Keys {
                         sos(true, app, k.event(KeyEvent.ACTION_DOWN));
                     } else {
                         releasedAt = 0;
-                        hal(PTT_ON);
+                        if (profile(app)) hal(PTT_ON);
                         ptt(true, app);
                     }
                     k.sentDown = true;
