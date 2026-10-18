@@ -1,0 +1,5 @@
+--- a/etc/sensors/hals.conf
++++ b/etc/sensors/hals.conf
+@@ -1 +1 @@
+-sensors.ssc.so
++sensors.xp8.so

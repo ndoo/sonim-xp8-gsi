@@ -23,6 +23,11 @@ rm -rf "$W" && mkdir -p "$W" "$C"
 "$PATCHELF" --add-needed libselinux.so --add-needed libc.so "$W/libxp8shim.so"
 cp "$W/libxp8shim.so" "$C/"
 
+# sensors.xp8.so: batching wrapper around the stock sensors.ssc.so (vendor/sensors/).
+"$NDK_BIN/clang" --target=aarch64-linux-android29 -O2 -fPIC -shared -Wall -Werror \
+    -Wl,-soname,sensors.xp8.so -Wl,-z,now -o "$W/sensors.xp8.so" "$SRC/sensors/xp8-sensors.c" -llog -ldl
+cp "$W/sensors.xp8.so" "$C/"
+
 # xp8-vibrator: links against a stub libbinder_ndk that adds the LL-NDK symbols.
 V=$W/vibrator && mkdir -p "$V"
 SYSROOT=$NDK_BIN/../sysroot

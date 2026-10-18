@@ -424,9 +424,9 @@ def main():
     a.repo = os.path.abspath(a.repo)
     a.components = os.path.abspath(a.components)
     vdir = os.path.join(a.repo, 'vendor')
-    # vendor/audio diffs are applied on the phone at boot (vendor/xp8-vendor-patch.sh).
+    # vendor/audio and vendor/sensors diffs are applied on the phone at boot (vendor/xp8-vendor-patch.sh).
     a.diffs = [os.path.join(dp, f) for dp, _, fs in os.walk(vdir) for f in fs
-               if f.endswith('.diff') and os.path.basename(dp) != 'audio']
+               if f.endswith('.diff') and os.path.basename(dp) not in ('audio', 'sensors')]
     os.makedirs(a.work, exist_ok=True)
     v = Vendor(a)
     v.extract()
