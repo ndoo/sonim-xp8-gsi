@@ -403,7 +403,7 @@ stage_messaging() {
 stage_xp8() {
     log "xp8: overlays, side keys, boot scripts and vendor config patches; no Provision"
     local c=$OUT/components f
-    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk XP8Updater.apk xp8-keys.dex; do
+    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk XP8Updater.apk xp8-keys.dex sensors.xp8.so; do
         [ -f "$c/$f" ] || { echo "missing $c/$f: run build/build-components.sh" >&2; exit 1; }
     done
     q_begin
@@ -495,13 +495,17 @@ PY
         q_put "$ROOT/vendor/keys/$f.kl" "/system/product/usr/keylayout/$f.kl" "$SYS"
     done
     q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
-    for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh; do
+    for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh sensors/xp8-sensors-screen.sh; do
         q_put "$ROOT/vendor/$f" "/system/bin/${f##*/}" "$SYS"
         q_meta "/system/bin/${f##*/}" 0100755 "$SYS"
     done
-    for f in "$ROOT"/vendor/audio/*.diff; do
+    for f in "$ROOT"/vendor/audio/*.diff "$ROOT"/vendor/sensors/*.diff; do
         q_put "$f" "/system/etc/xp8/vendor-patches/${f##*/}" "$SYS"
     done
+    q "rm /odm/lib64"
+    q "mkdir /odm/lib64"
+    q_meta /odm/lib64 040755 u:object_r:vendor_file:s0
+    q_put "$c/sensors.xp8.so" /odm/lib64/sensors.xp8.so u:object_r:vendor_file:s0
     q_commit
 }
 
