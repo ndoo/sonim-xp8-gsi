@@ -340,13 +340,15 @@ PY
 }
 
 stage_services() {
-    log "services: AuthService keeps HIDL fingerprint configs when AIDL instances exist"
+    log "services: AuthService keeps HIDL fingerprint configs when AIDL instances exist; battery protection LED colour"
     local s=$W/services o=/system/framework/oat/arm64 n
     rm -rf "$s" && mkdir -p "$s"
     dump /system/framework/services.jar "$s/services.jar"
     unzip -q -d "$s/dex" "$s/services.jar" classes.dex
     "${BAKSMALI[@]}" d "$s/dex/classes.dex" -o "$s/svd"
-    patch -s -p1 -d "$s/svd" < "$PATCHES/services/authservice-fp.smali.diff"
+    for n in "$PATCHES"/services/*.smali.diff; do
+        patch -s -p1 -d "$s/svd" < "$n"
+    done
     "${SMALI[@]}" a "$s/svd" -o "$s/classes.dex" --api 36 -j 1
     repack_dex "$s/services.jar" "$s/classes.dex" "$s/services-a.jar"
 
