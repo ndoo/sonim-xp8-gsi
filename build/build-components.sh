@@ -28,6 +28,11 @@ cp "$W/libxp8shim.so" "$C/"
     -Wl,-soname,sensors.xp8.so -Wl,-z,now -o "$W/sensors.xp8.so" "$SRC/sensors/xp8-sensors.c" -llog -ldl
 cp "$W/sensors.xp8.so" "$C/"
 
+# lights.qcom.so: RGB LED blink and steady colours, stock lights.sdm660.so for the rest (vendor/lights/).
+"$NDK_BIN/clang" --target=aarch64-linux-android29 -O2 -fPIC -shared -Wall -Werror \
+    -Wl,-soname,lights.qcom.so -Wl,-z,now -o "$W/lights.qcom.so" "$SRC/lights/xp8-lights.c" -llog -ldl
+cp "$W/lights.qcom.so" "$C/"
+
 # xp8-vibrator: links against a stub libbinder_ndk that adds the LL-NDK symbols.
 V=$W/vibrator && mkdir -p "$V"
 SYSROOT=$NDK_BIN/../sysroot

@@ -403,7 +403,7 @@ stage_messaging() {
 stage_xp8() {
     log "xp8: overlays, side keys, boot scripts and vendor config patches; no Provision"
     local c=$OUT/components f
-    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk XP8Updater.apk xp8-keys.dex sensors.xp8.so; do
+    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk XP8Updater.apk xp8-keys.dex sensors.xp8.so lights.qcom.so; do
         [ -f "$c/$f" ] || { echo "missing $c/$f: run build/build-components.sh" >&2; exit 1; }
     done
     q_begin
@@ -506,6 +506,10 @@ PY
     q "mkdir /odm/lib64"
     q_meta /odm/lib64 040755 u:object_r:vendor_file:s0
     q_put "$c/sensors.xp8.so" /odm/lib64/sensors.xp8.so u:object_r:vendor_file:s0
+    q "mkdir /odm/lib64/hw"
+    q_meta /odm/lib64/hw 040755 u:object_r:vendor_file:s0
+    MADE[/odm/lib64/hw]=1
+    q_put "$c/lights.qcom.so" /odm/lib64/hw/lights.qcom.so u:object_r:vendor_file:s0
     q_commit
 }
 
