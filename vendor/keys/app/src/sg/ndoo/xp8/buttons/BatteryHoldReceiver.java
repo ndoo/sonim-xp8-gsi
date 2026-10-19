@@ -14,7 +14,7 @@ import android.text.format.DateFormat;
 import java.util.Date;
 
 /**
- * The battery protection notification. BATTERY_HOLD comes from the side-key daemon whenever the
+ * The battery protection notification. BATTERY_HOLD comes from the XP8 daemon whenever the
  * health HAL's hold starts, changes or ends; CHARGE_NOW comes from the notification's button.
  * After boot and app updates the receiver reads the hold from the HAL itself: the daemon's
  * broadcast at boot arrives before the first unlock, when this app cannot run.

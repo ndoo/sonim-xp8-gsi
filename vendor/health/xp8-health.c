@@ -53,7 +53,7 @@ enum { ST_UNKNOWN = 1, ST_CHARGING, ST_DISCHARGING, ST_NOT_CHARGING, ST_FULL };
 enum { POLICY_DEFAULT = 1, POLICY_LONG_LIFE = 2, POLICY_ADAPTIVE = 3 };
 enum { CS_NORMAL = 1, CS_TOO_HOT = 3, CS_LONG_LIFE = 4, CS_ADAPTIVE = 5 };
 enum { HOLD_NONE, HOLD_HEAT, HOLD_NIGHT, HOLD_BASIC, HOLD_LIMIT };
-// Transactions beyond IHealth, for the XP8 Buttons app and the side-key daemon.
+// Transactions beyond IHealth, for the XP8 Buttons app and the XP8 daemon.
 #define TX_CHARGE_NOW 1000
 #define TX_PROTECTION_STATUS 1001
 

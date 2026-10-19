@@ -4,7 +4,7 @@
      SPDX-License-Identifier: MIT
 
      XP8 Buttons: the Settings > Programmable keys page that chooses what the
-     XP8 side keys do. The side-key daemon (vendor/keys/Xp8Keys.java) reads
+     XP8 side keys do. The XP8 daemon (vendor/daemon/Xp8Daemon.java) reads
      files/keys.properties and acts on it. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="sg.ndoo.xp8.buttons">

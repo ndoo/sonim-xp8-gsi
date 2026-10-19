@@ -405,7 +405,7 @@ stage_messaging() {
 stage_xp8() {
     log "xp8: overlays, side keys, boot scripts and vendor config patches; no Provision"
     local c=$OUT/components f
-    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk XP8Updater.apk xp8-keys.dex sensors.xp8.so lights.qcom.so; do
+    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk XP8Updater.apk xp8-daemon.dex sensors.xp8.so lights.qcom.so; do
         [ -f "$c/$f" ] || { echo "missing $c/$f: run build/build-components.sh" >&2; exit 1; }
     done
     q_begin
@@ -494,12 +494,12 @@ PY
     printf '\nparallel_restorecon enabled\n' >> "$W/ueventd.rc"
     q "rm /system/etc/ueventd.rc"
     q_put "$W/ueventd.rc" /system/etc/ueventd.rc "$SYS"
-    q_put "$c/xp8-keys.dex" /system/etc/xp8/xp8-keys.dex "$SYS"
+    q_put "$c/xp8-daemon.dex" /system/etc/xp8/xp8-daemon.dex "$SYS"
     for f in gpio-keys PTT-Headset-Button; do
         q_put "$ROOT/vendor/keys/$f.kl" "/system/product/usr/keylayout/$f.kl" "$SYS"
     done
     q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
-    for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh sensors/xp8-sensors-screen.sh; do
+    for f in xp8-gsi.sh daemon/xp8-daemon.sh xp8-vendor-patch.sh sensors/xp8-sensors-screen.sh; do
         q_put "$ROOT/vendor/$f" "/system/bin/${f##*/}" "$SYS"
         q_meta "/system/bin/${f##*/}" 0100755 "$SYS"
     done

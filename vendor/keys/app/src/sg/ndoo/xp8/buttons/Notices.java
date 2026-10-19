@@ -13,7 +13,7 @@ final class Notices {
 
     /**
      * NAME is the key as shown (PTT, YELLOW, ALARM). PKG is the app it goes to; "" means no app,
-     * null means automatic, which only the side-key daemon can resolve and announces itself.
+     * null means automatic, which only the XP8 daemon can resolve and announces itself.
      */
     static void toast(Context c, String name, String pkg) {
         if (pkg == null) return;

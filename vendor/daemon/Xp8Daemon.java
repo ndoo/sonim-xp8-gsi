@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2026 Andrew Yong
 // SPDX-License-Identifier: MIT
 //
-// Side-key daemon: does what the XP8 side keys did on stock, where Sonim's
-// framework (PhoneWindowManager and SonimSdkPolicy) handled them.
+// XP8 daemon: does what the XP8 side keys did on stock, where Sonim's framework
+// (PhoneWindowManager and SonimSdkPolicy) handled them, and drives the battery
+// protection notification of XP8 Buttons.
 //
 // Reads the gpio-keys input device directly: PTT (scancode 149), SOS (148) and
 // the camera key (766), and the headset PTT button (249 on PTT-Headset-Button).
@@ -34,7 +35,7 @@
 // The XP8 Buttons app (vendor/keys/app) writes the choices to CONFIG; keys it has
 // not set keep the defaults below. Started by vendor/xp8-gsi.rc as root.
 //
-// usage: app_process -cp xp8-keys.dex /system/etc/xp8 Xp8Keys [daemon | set k=v | get k]
+// usage: app_process -cp xp8-daemon.dex /system/etc/xp8 Xp8Daemon [daemon | set k=v | get k]
 
 import android.content.ComponentName;
 import android.content.Intent;
@@ -74,7 +75,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class Xp8Keys {
+public class Xp8Daemon {
     static final String CONFIG = "/data/data/sg.ndoo.xp8.buttons/files/keys.properties";
     static final String SONIM = "com.sonim.intent.action.";
     static final String SONIM_PTT = SONIM + "PTT_KEY_DOWN", SONIM_SOS = SONIM + "SOS_KEY_DOWN";
@@ -117,12 +118,12 @@ public class Xp8Keys {
         } else if (a.length == 0 || a[0].equals("daemon")) {
             daemon();
         } else {
-            System.err.println("usage: Xp8Keys [daemon | set k=v | get k]");
+            System.err.println("usage: Xp8Daemon [daemon | set k=v | get k]");
         }
     }
 
     static void log(String m) {
-        android.util.Log.i("xp8-keys", m);
+        android.util.Log.i("xp8-daemon", m);
     }
 
     // Scancode -> key name in CONFIG.
@@ -407,8 +408,8 @@ public class Xp8Keys {
     // The kernel wake lock keeps the phone from suspending until the screen is on.
     static void wake() {
         try {
-            Files.write(new File("/sys/power/wake_lock").toPath(), "xp8-keys 2000000000".getBytes());
-            wakeUp.invoke(power, SystemClock.uptimeMillis(), 6, "xp8-keys:PTT", "android"); // WAKE_REASON_WAKE_KEY
+            Files.write(new File("/sys/power/wake_lock").toPath(), "xp8-daemon 2000000000".getBytes());
+            wakeUp.invoke(power, SystemClock.uptimeMillis(), 6, "xp8-daemon:PTT", "android"); // WAKE_REASON_WAKE_KEY
         } catch (Exception e) {
             log("wake failed: " + e);
         }
@@ -657,7 +658,7 @@ public class Xp8Keys {
         protected boolean onTransact(int code, Parcel data, Parcel reply, int flags)
                 throws android.os.RemoteException {
             if (code != 1) return super.onTransact(code, data, reply, flags);   // healthInfoChanged
-            SEND.execute(Xp8Keys::checkHold);
+            SEND.execute(Xp8Daemon::checkHold);
             return true;
         }
     };

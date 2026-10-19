@@ -40,7 +40,7 @@ import java.util.Properties;
 
 /**
  * Settings > Programmable keys: what the XP8 side keys do. Writes files/keys.properties;
- * the side-key daemon (vendor/keys/Xp8Keys.java) reads it on every key press.
+ * the XP8 daemon (vendor/daemon/Xp8Daemon.java) reads it on every key press.
  *
  * Per key (ptt, camera, sos; shown with Sonim's names PTT, YELLOW and ALARM):
  *   KEY.forward  "" (off), "auto" (the app Sonim's AppKey policy picks; "*" from older
@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
 
     void save() {
         try (FileOutputStream out = new FileOutputStream(file)) {
-            config.store(out, "XP8 Buttons; read by the side-key daemon (Xp8Keys)");
+            config.store(out, "XP8 Buttons; read by the XP8 daemon (Xp8Daemon)");
         } catch (Exception e) {
             new AlertDialog.Builder(this).setMessage("Could not save: " + e).show();
         }

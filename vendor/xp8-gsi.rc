@@ -10,11 +10,12 @@ service xp8-gsi /system/bin/xp8-gsi.sh
 
 on property:sys.boot_completed=1 && property:ro.vendor.xp8.layout=*
     start xp8-gsi
-    start vendor.xp8-keys
+    start vendor.xp8-daemon
 
-# Side keys (PTT, SOS, camera) as on stock: Sonim's SPCCService, which handled them, is a
-# system app the GSI cannot install. Restarted by init if it exits.
-service vendor.xp8-keys /system/bin/xp8-keys.sh
+# The XP8 daemon: side keys (PTT, SOS, camera) as on stock, where Sonim's SPCCService (a system
+# app the GSI cannot install) handled them, and the battery protection notification.
+# Restarted by init if it exits.
+service vendor.xp8-daemon /system/bin/xp8-daemon.sh
     class late_start
     user root
     group root input audio
