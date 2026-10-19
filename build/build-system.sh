@@ -418,6 +418,8 @@ stage_xp8() {
         /system/system_ext/etc/permissions/privapp-permissions-xp8updater.xml "$SYS"
     q_put "$ROOT/vendor/updater/default-permissions-xp8updater.xml" \
         /system/system_ext/etc/default-permissions/default-permissions-xp8updater.xml "$SYS"
+    q_put "$ROOT/vendor/keys/app/default-permissions-xp8buttons.xml" \
+        /system/product/etc/default-permissions/default-permissions-xp8buttons.xml "$SYS"
     # XP8Updater compares ro.xp8.release with the tag in the latest ota.json.
     dump /system/build.prop "$W/build.prop"
     printf '\n# XP8 GSI release\nro.xp8.release=%s\n' "$REL" >> "$W/build.prop"
@@ -510,6 +512,19 @@ PY
     q_meta /odm/lib64/hw 040755 u:object_r:vendor_file:s0
     MADE[/odm/lib64/hw]=1
     q_put "$c/lights.qcom.so" /odm/lib64/hw/lights.qcom.so u:object_r:vendor_file:s0
+    q "rm /odm/etc"
+    q "mkdir /odm/etc"
+    q_meta /odm/etc 040755 u:object_r:vendor_configs_file:s0
+    for d in /odm/etc/vintf /odm/etc/vintf/manifest; do
+        q "mkdir $d"
+        q_meta "$d" 040755 u:object_r:vendor_configs_file:s0
+        MADE[$d]=1
+    done
+    # The Android 10 vendor linker namespace (which /odm/bin would use) has no libbinder_ndk.
+    q_put "$c/xp8-health" /system/bin/xp8-health "$SYS"
+    q_meta /system/bin/xp8-health 0100755 "$SYS"
+    q_put "$c/android.hardware.health-xp8.xml" /odm/etc/vintf/manifest/android.hardware.health-xp8.xml \
+        u:object_r:vendor_configs_file:s0
     q_commit
 }
 

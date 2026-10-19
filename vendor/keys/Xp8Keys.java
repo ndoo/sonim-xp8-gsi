@@ -40,7 +40,10 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.os.Binder;
 import android.os.Bundle;
+import android.os.IBinder;
+import android.os.Parcel;
 import android.os.SystemClock;
 import android.view.KeyEvent;
 
@@ -640,6 +643,87 @@ public class Xp8Keys {
         }
     }
 
+    // Battery protection: the health HAL (vendor/health/xp8-health.c) calls back on every battery
+    // change; when its hold starts, changes or ends, XP8 Buttons shows or clears its notification.
+    static final String HEALTH = "android.hardware.health.IHealth/default";
+    static final String HEALTH_DESCRIPTOR = "android.hardware.health.IHealth";
+    static final int TX_REGISTER_CALLBACK = 1, TX_PROTECTION_STATUS = 1001;
+    static final String BATTERY_HOLD = APP + ".BATTERY_HOLD";
+    static volatile IBinder health;
+    static String holdShown = "";
+
+    static final Binder HEALTH_CALLBACK = new Binder() {
+        @Override
+        protected boolean onTransact(int code, Parcel data, Parcel reply, int flags)
+                throws android.os.RemoteException {
+            if (code != 1) return super.onTransact(code, data, reply, flags);   // healthInfoChanged
+            SEND.execute(Xp8Keys::checkHold);
+            return true;
+        }
+    };
+
+    static void watchBattery() {
+        HEALTH_CALLBACK.attachInterface(null, "android.hardware.health.IHealthInfoCallback");
+        Thread t = new Thread(() -> {
+            while (true) {
+                try {
+                    IBinder b = (IBinder) Class.forName("android.os.ServiceManager")
+                            .getMethod("checkService", String.class).invoke(null, HEALTH);
+                    if (b != null && b != health) {
+                        Parcel d = Parcel.obtain(), r = Parcel.obtain();
+                        try {
+                            d.writeInterfaceToken(HEALTH_DESCRIPTOR);
+                            d.writeStrongBinder(HEALTH_CALLBACK);
+                            b.transact(TX_REGISTER_CALLBACK, d, r, 0);
+                            r.readException();
+                        } finally {
+                            d.recycle();
+                            r.recycle();
+                        }
+                        health = b;
+                        log("battery protection: watching the health HAL");
+                    }
+                } catch (Exception e) {
+                    health = null;
+                    log("battery protection: " + e);
+                }
+                try {
+                    Thread.sleep(health != null && health.isBinderAlive() ? 60000 : 10000);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                if (health != null && !health.isBinderAlive()) health = null;
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+    }
+
+    // HAL reason: 0 none, 1 heat, 2 overnight, 3 at 100 % (no notice), 4 limit to 80 %.
+    static void checkHold() {
+        IBinder b = health;
+        if (b == null) return;
+        Parcel d = Parcel.obtain(), r = Parcel.obtain();
+        try {
+            d.writeInterfaceToken(HEALTH_DESCRIPTOR);
+            b.transact(TX_PROTECTION_STATUS, d, r, 0);
+            r.readException();
+            int reason = r.readInt();
+            long fullBy = r.readLong();
+            if (reason == 3) reason = 0;
+            String shown = reason + ":" + fullBy;
+            if (shown.equals(holdShown)) return;
+            holdShown = shown;
+            send(new Intent(BATTERY_HOLD).setPackage(APP).addFlags(FLAGS)
+                    .putExtra("reason", reason).putExtra("fullBy", fullBy));
+        } catch (Exception e) {
+            log("battery protection status: " + e);
+        } finally {
+            d.recycle();
+            r.recycle();
+        }
+    }
+
     // struct input_event on arm64: timeval (16 bytes), type (2), code (2), value (4).
     static void read(String dev) throws Exception {
         DataInputStream in = new DataInputStream(new FileInputStream(dev));
@@ -656,6 +740,7 @@ public class Xp8Keys {
         if (keys == null) throw new IllegalStateException("no gpio-keys input device");
         String headset = inputDevice("PTT-Headset-Button");
         initActivityManager();
+        watchBattery();
         try {
             initPowerManager();
         } catch (Exception e) {

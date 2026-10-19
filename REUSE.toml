@@ -28,7 +28,7 @@ SPDX-FileCopyrightText = "The Android Open Source Project; 2026 Andrew Yong"
 SPDX-License-Identifier = "Apache-2.0"
 
 [[annotations]]
-path = ["vendor/vibrator/*.xml"]
+path = ["vendor/vibrator/*.xml", "vendor/health/*.xml"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Andrew Yong"
 SPDX-License-Identifier = "MIT"
