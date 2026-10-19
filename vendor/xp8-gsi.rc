@@ -59,13 +59,6 @@ service vendor.xp8-vibrator /vendor/etc/xp8/xp8-vibrator
     group system
     seclabel u:r:hal_vibrator_default:s0
 
-# Sonim's device tree sets a 2 s PWM period on the RGB LED (Qualcomm's pm660l.dtsi uses 1 ms),
-# which makes any colour with a channel below full brightness blink.
-on boot && property:ro.vendor.xp8.layout=*
-    write /sys/class/leds/red/pwm_us 1000
-    write /sys/class/leds/green/pwm_us 1000
-    write /sys/class/leds/blue/pwm_us 1000
-
 # update_verifier reboots unless verity is enforcing; this reboot reason makes the ABL leave EIO mode.
 on post-fs && property:ro.boot.veritymode=logging && property:ro.vendor.xp8.layout=*
     setprop sys.powerctl "reboot,dm-verity enforcing"
