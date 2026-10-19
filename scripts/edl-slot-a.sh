@@ -70,7 +70,9 @@ if "setactiveslot" not in a or "<slot>" not in a:
 a["getactiveslot"] = False
 a["setactiveslot"] = True
 a["<slot>"] = "a"
-sys.exit(0 if edl.main(a).run() == 0 else 1)
+# imported='' makes run() return after connecting without running the command.
+edl.main(a, imported="cli").run()
+sys.exit(0)
 PY
     )
 }
