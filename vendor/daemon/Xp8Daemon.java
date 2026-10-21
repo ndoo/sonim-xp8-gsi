@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2026 Andrew Yong
 // SPDX-License-Identifier: MIT
 //
-// Side-key daemon: does what the XP8 side keys did on stock, where Sonim's
-// framework (PhoneWindowManager and SonimSdkPolicy) handled them.
+// XP8 daemon: does what the XP8 side keys did on stock, where Sonim's framework
+// (PhoneWindowManager and SonimSdkPolicy) handled them, and drives the battery
+// protection notification of XP8 Buttons.
 //
 // Reads the gpio-keys input device directly: PTT (scancode 149), SOS (148) and
 // the camera key (766), and the headset PTT button (249 on PTT-Headset-Button).
@@ -34,13 +35,16 @@
 // The XP8 Buttons app (vendor/keys/app) writes the choices to CONFIG; keys it has
 // not set keep the defaults below. Started by vendor/xp8-gsi.rc as root.
 //
-// usage: app_process -cp xp8-keys.dex /system/etc/xp8 Xp8Keys [daemon | set k=v | get k]
+// usage: app_process -cp xp8-daemon.dex /system/etc/xp8 Xp8Daemon [daemon | set k=v | get k]
 
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.os.Binder;
 import android.os.Bundle;
+import android.os.IBinder;
+import android.os.Parcel;
 import android.os.SystemClock;
 import android.view.KeyEvent;
 
@@ -71,7 +75,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class Xp8Keys {
+public class Xp8Daemon {
     static final String CONFIG = "/data/data/sg.ndoo.xp8.buttons/files/keys.properties";
     static final String SONIM = "com.sonim.intent.action.";
     static final String SONIM_PTT = SONIM + "PTT_KEY_DOWN", SONIM_SOS = SONIM + "SOS_KEY_DOWN";
@@ -114,12 +118,12 @@ public class Xp8Keys {
         } else if (a.length == 0 || a[0].equals("daemon")) {
             daemon();
         } else {
-            System.err.println("usage: Xp8Keys [daemon | set k=v | get k]");
+            System.err.println("usage: Xp8Daemon [daemon | set k=v | get k]");
         }
     }
 
     static void log(String m) {
-        android.util.Log.i("xp8-keys", m);
+        android.util.Log.i("xp8-daemon", m);
     }
 
     // Scancode -> key name in CONFIG.
@@ -404,8 +408,8 @@ public class Xp8Keys {
     // The kernel wake lock keeps the phone from suspending until the screen is on.
     static void wake() {
         try {
-            Files.write(new File("/sys/power/wake_lock").toPath(), "xp8-keys 2000000000".getBytes());
-            wakeUp.invoke(power, SystemClock.uptimeMillis(), 6, "xp8-keys:PTT", "android"); // WAKE_REASON_WAKE_KEY
+            Files.write(new File("/sys/power/wake_lock").toPath(), "xp8-daemon 2000000000".getBytes());
+            wakeUp.invoke(power, SystemClock.uptimeMillis(), 6, "xp8-daemon:PTT", "android"); // WAKE_REASON_WAKE_KEY
         } catch (Exception e) {
             log("wake failed: " + e);
         }
@@ -640,6 +644,87 @@ public class Xp8Keys {
         }
     }
 
+    // Battery protection: the health HAL (vendor/health/xp8-health.c) calls back on every battery
+    // change; when its hold starts, changes or ends, XP8 Buttons shows or clears its notification.
+    static final String HEALTH = "android.hardware.health.IHealth/default";
+    static final String HEALTH_DESCRIPTOR = "android.hardware.health.IHealth";
+    static final int TX_REGISTER_CALLBACK = 1, TX_PROTECTION_STATUS = 1001;
+    static final String BATTERY_HOLD = APP + ".BATTERY_HOLD";
+    static volatile IBinder health;
+    static String holdShown = "";
+
+    static final Binder HEALTH_CALLBACK = new Binder() {
+        @Override
+        protected boolean onTransact(int code, Parcel data, Parcel reply, int flags)
+                throws android.os.RemoteException {
+            if (code != 1) return super.onTransact(code, data, reply, flags);   // healthInfoChanged
+            SEND.execute(Xp8Daemon::checkHold);
+            return true;
+        }
+    };
+
+    static void watchBattery() {
+        HEALTH_CALLBACK.attachInterface(null, "android.hardware.health.IHealthInfoCallback");
+        Thread t = new Thread(() -> {
+            while (true) {
+                try {
+                    IBinder b = (IBinder) Class.forName("android.os.ServiceManager")
+                            .getMethod("checkService", String.class).invoke(null, HEALTH);
+                    if (b != null && b != health) {
+                        Parcel d = Parcel.obtain(), r = Parcel.obtain();
+                        try {
+                            d.writeInterfaceToken(HEALTH_DESCRIPTOR);
+                            d.writeStrongBinder(HEALTH_CALLBACK);
+                            b.transact(TX_REGISTER_CALLBACK, d, r, 0);
+                            r.readException();
+                        } finally {
+                            d.recycle();
+                            r.recycle();
+                        }
+                        health = b;
+                        log("battery protection: watching the health HAL");
+                    }
+                } catch (Exception e) {
+                    health = null;
+                    log("battery protection: " + e);
+                }
+                try {
+                    Thread.sleep(health != null && health.isBinderAlive() ? 60000 : 10000);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                if (health != null && !health.isBinderAlive()) health = null;
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+    }
+
+    // HAL reason: 0 none, 1 heat, 2 overnight, 3 at 100 % (no notice), 4 limit to 80 %.
+    static void checkHold() {
+        IBinder b = health;
+        if (b == null) return;
+        Parcel d = Parcel.obtain(), r = Parcel.obtain();
+        try {
+            d.writeInterfaceToken(HEALTH_DESCRIPTOR);
+            b.transact(TX_PROTECTION_STATUS, d, r, 0);
+            r.readException();
+            int reason = r.readInt();
+            long fullBy = r.readLong();
+            if (reason == 3) reason = 0;
+            String shown = reason + ":" + fullBy;
+            if (shown.equals(holdShown)) return;
+            holdShown = shown;
+            send(new Intent(BATTERY_HOLD).setPackage(APP).addFlags(FLAGS)
+                    .putExtra("reason", reason).putExtra("fullBy", fullBy));
+        } catch (Exception e) {
+            log("battery protection status: " + e);
+        } finally {
+            d.recycle();
+            r.recycle();
+        }
+    }
+
     // struct input_event on arm64: timeval (16 bytes), type (2), code (2), value (4).
     static void read(String dev) throws Exception {
         DataInputStream in = new DataInputStream(new FileInputStream(dev));
@@ -656,6 +741,7 @@ public class Xp8Keys {
         if (keys == null) throw new IllegalStateException("no gpio-keys input device");
         String headset = inputDevice("PTT-Headset-Button");
         initActivityManager();
+        watchBattery();
         try {
             initPowerManager();
         } catch (Exception e) {

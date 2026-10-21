@@ -49,6 +49,19 @@ mkdir -p "$V/stub"
     -L "$V/stub" -lbinder_ndk -llog
 cp "$SRC/vibrator/android.hardware.vibrator-xp8.xml" "$C/"
 
+# xp8-health: AIDL health HAL with battery protection, same libbinder_ndk stub approach.
+H=$W/health && mkdir -p "$H/stub"
+"$NDK_BIN/clang" --target=$VTGT -O2 -fPIE -Wall -Werror -I "$SRC/vibrator/include" \
+    -c -o "$H/xp8-health.o" "$SRC/health/xp8-health.c"
+python3 "$ROOT/build/lib/ndkstub.py" "$NDK_BIN/llvm-readelf" "$H" \
+    "$SYSROOT/usr/lib/aarch64-linux-android/30/libbinder_ndk.so" \
+    "$SRC/health/libbinder_ndk.platform.txt" "$H/xp8-health.o" >/dev/null
+"$NDK_BIN/clang" --target=$VTGT -shared -nostdlib -Wl,-soname,libbinder_ndk.so \
+    -Wl,--version-script,"$H/stub.map" -o "$H/stub/libbinder_ndk.so" "$H/stub.c"
+"$NDK_BIN/clang" --target=$VTGT -pie -Wl,-z,now -o "$C/xp8-health" "$H/xp8-health.o" \
+    -L "$H/stub" -lbinder_ndk -llog
+cp "$SRC/health/android.hardware.health-xp8.xml" "$C/"
+
 # Static RROs, signed with the AOSP testkey.
 for d in "$SRC"/rro/*/; do
     n=$(basename "$d")
@@ -59,12 +72,12 @@ for d in "$SRC"/rro/*/; do
     sign_apk testkey "$r/a.apk" "$C/$n.apk"
 done
 
-# Side keys: the daemon (vendor/keys/Xp8Keys.java, run with app_process) and the
+# The XP8 daemon (vendor/daemon/Xp8Daemon.java, run with app_process) and the
 # XP8 Buttons settings app, signed with the AOSP testkey.
 K=$W/keys && mkdir -p "$K/daemon" "$K/app"
-javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$K/daemon" "$SRC/keys/Xp8Keys.java"
+javac --release 11 -Xlint:-options -cp "$ANDROID_JAR" -d "$K/daemon" "$SRC/daemon/Xp8Daemon.java"
 "${D8[@]}" --release --min-api 29 --lib "$ANDROID_JAR" --output "$K/daemon" "$K"/daemon/*.class
-cp "$K/daemon/classes.dex" "$C/xp8-keys.dex"
+cp "$K/daemon/classes.dex" "$C/xp8-daemon.dex"
 "$AAPT2" compile --dir "$SRC/keys/app/res" -o "$K/res.zip"
 "$AAPT2" link -o "$K/u.apk" --manifest "$SRC/keys/app/AndroidManifest.xml" -I "$ANDROID_JAR" \
     --min-sdk-version 29 --target-sdk-version 35 --version-code 2 --version-name 1.1 "$K/res.zip"

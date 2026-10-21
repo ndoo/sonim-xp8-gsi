@@ -4,7 +4,7 @@
 #
 # The stock /vendor/usr/keylayout/gpio-keys.kl with PTT and SOS as 12 and 11, the
 # keycodes (228, 227) of Sonim's KEYCODE_PTT and KEYCODE_SOS. The camera key (766)
-# is left unmapped: the side-key daemon handles it.
+# is left unmapped: the XP8 daemon handles it.
 
 key 115   VOLUME_UP
 key 114   VOLUME_DOWN

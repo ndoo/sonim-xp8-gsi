@@ -1,0 +1,6 @@
+# libbinder_ndk symbols outside the public NDK (LL-NDK/platform), with the
+# version node the device library exports them under.
+ABinderProcess_joinThreadPool LIBBINDER_NDK
+ABinderProcess_setThreadPoolMaxThreadCount LIBBINDER_NDK
+AServiceManager_addService LIBBINDER_NDK
+AIBinder_markVintfStability LIBBINDER_NDK30

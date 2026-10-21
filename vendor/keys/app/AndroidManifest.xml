@@ -4,7 +4,7 @@
      SPDX-License-Identifier: MIT
 
      XP8 Buttons: the Settings > Programmable keys page that chooses what the
-     XP8 side keys do. The side-key daemon (vendor/keys/Xp8Keys.java) reads
+     XP8 side keys do. The XP8 daemon (vendor/daemon/Xp8Daemon.java) reads
      files/keys.properties and acts on it. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="sg.ndoo.xp8.buttons">
@@ -31,6 +31,9 @@
         </intent>
     </queries>
 
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:label="Programmable keys"
         android:icon="@drawable/ic_programmable_keys"
@@ -53,6 +56,33 @@
             <meta-data android:name="com.android.settings.summary" android:value="PTT, YELLOW and ALARM keys" />
             <meta-data android:name="com.android.settings.icon" android:resource="@drawable/ic_programmable_keys" />
         </activity>
+        <!-- An entry on the Settings Battery page (PowerUsageSummary, category ia.battery). -->
+        <activity
+            android:name=".BatteryProtectionActivity"
+            android:label="Battery protection"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.android.settings.action.EXTRA_SETTINGS" />
+            </intent-filter>
+            <meta-data android:name="com.android.settings.category"
+                android:value="com.android.settings.category.ia.battery" />
+            <meta-data android:name="com.android.settings.keyhint" android:value="battery_protection" />
+            <meta-data android:name="com.android.settings.title" android:value="Battery protection" />
+            <meta-data android:name="com.android.settings.summary"
+                android:value="Charge limit and heat protection" />
+        </activity>
+        <!-- BATTERY_HOLD from the daemon (root) when the health HAL's hold changes; CHARGE_NOW
+             from the notification; boot and updates re-read the hold. -->
+        <receiver
+            android:name=".BatteryHoldReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="sg.ndoo.xp8.buttons.BATTERY_HOLD" />
+                <action android:name="sg.ndoo.xp8.buttons.CHARGE_NOW" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <!-- Sent by the daemon (root) when a key's app changes or a key has no app. -->
         <receiver
             android:name=".NoticeReceiver"

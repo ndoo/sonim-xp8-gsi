@@ -11,7 +11,7 @@ import android.os.Bundle;
 import java.util.Collection;
 
 /**
- * Which app Sonim's AppKey policy gives a key. The side-key daemon (vendor/keys/Xp8Keys.java,
+ * Which app Sonim's AppKey policy gives a key. The XP8 daemon (vendor/daemon/Xp8Daemon.java,
  * pick()) applies the same rule; keep them equal. Apps claim a key with app_key_&lt;key&gt;_*
  * meta-data: claimants first, then the highest app_key_&lt;key&gt;_priority (stock sorts by
  * "priority DESC"), then the earliest install.

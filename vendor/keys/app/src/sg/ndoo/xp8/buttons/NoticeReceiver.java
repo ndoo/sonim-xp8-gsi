@@ -8,7 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 
-/** Sent by the side-key daemon (root) when a key's app changes or a key has none. */
+/** Sent by the XP8 daemon (root) when a key's app changes or a key has none. */
 public class NoticeReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {

@@ -10,11 +10,12 @@ service xp8-gsi /system/bin/xp8-gsi.sh
 
 on property:sys.boot_completed=1 && property:ro.vendor.xp8.layout=*
     start xp8-gsi
-    start vendor.xp8-keys
+    start vendor.xp8-daemon
 
-# Side keys (PTT, SOS, camera) as on stock: Sonim's SPCCService, which handled them, is a
-# system app the GSI cannot install. Restarted by init if it exits.
-service vendor.xp8-keys /system/bin/xp8-keys.sh
+# The XP8 daemon: side keys (PTT, SOS, camera) as on stock, where Sonim's SPCCService (a system
+# app the GSI cannot install) handled them, and the battery protection notification.
+# Restarted by init if it exits.
+service vendor.xp8-daemon /system/bin/xp8-daemon.sh
     class late_start
     user root
     group root input audio
@@ -64,6 +65,25 @@ on early-boot && property:ro.vendor.xp8.layout=*
     chown system system /sys/class/leds/red/pwm_us
     chown system system /sys/class/leds/green/pwm_us
     chown system system /sys/class/leds/blue/pwm_us
+
+# AIDL health HAL with battery protection (vendor/health), declared in /odm/etc/vintf.
+# It runs from /system/bin: the stock vendor linker namespace has no libbinder_ndk.
+on early-boot && property:ro.vendor.xp8.layout=*
+    chown system system /sys/class/power_supply/battery/input_suspend
+
+# Charging history for the learned overnight hold.
+on post-fs-data && property:ro.vendor.xp8.layout=*
+    mkdir /data/vendor/xp8 0770 system system
+
+service vendor.xp8-health /system/bin/xp8-health
+    class hal
+    user system
+    group system
+    seclabel u:r:hal_health_default:s0
+
+# Charging must not stay suspended without the HAL.
+on property:init.svc.vendor.xp8-health=stopped
+    write /sys/class/power_supply/battery/input_suspend 0
 
 # update_verifier reboots unless verity is enforcing; this reboot reason makes the ABL leave EIO mode.
 on post-fs && property:ro.boot.veritymode=logging && property:ro.vendor.xp8.layout=*

@@ -340,13 +340,15 @@ PY
 }
 
 stage_services() {
-    log "services: AuthService keeps HIDL fingerprint configs when AIDL instances exist"
+    log "services: AuthService keeps HIDL fingerprint configs when AIDL instances exist; battery protection LED colour"
     local s=$W/services o=/system/framework/oat/arm64 n
     rm -rf "$s" && mkdir -p "$s"
     dump /system/framework/services.jar "$s/services.jar"
     unzip -q -d "$s/dex" "$s/services.jar" classes.dex
     "${BAKSMALI[@]}" d "$s/dex/classes.dex" -o "$s/svd"
-    patch -s -p1 -d "$s/svd" < "$PATCHES/services/authservice-fp.smali.diff"
+    for n in "$PATCHES"/services/*.smali.diff; do
+        patch -s -p1 -d "$s/svd" < "$n"
+    done
     "${SMALI[@]}" a "$s/svd" -o "$s/classes.dex" --api 36 -j 1
     repack_dex "$s/services.jar" "$s/classes.dex" "$s/services-a.jar"
 
@@ -403,7 +405,7 @@ stage_messaging() {
 stage_xp8() {
     log "xp8: overlays, side keys, boot scripts and vendor config patches; no Provision"
     local c=$OUT/components f
-    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk XP8Updater.apk xp8-keys.dex sensors.xp8.so lights.qcom.so; do
+    for f in XP8FrameworksRes.apk XP8Settings.apk XP8SystemUI.apk XP8Buttons.apk XP8Updater.apk xp8-daemon.dex sensors.xp8.so lights.qcom.so; do
         [ -f "$c/$f" ] || { echo "missing $c/$f: run build/build-components.sh" >&2; exit 1; }
     done
     q_begin
@@ -418,6 +420,8 @@ stage_xp8() {
         /system/system_ext/etc/permissions/privapp-permissions-xp8updater.xml "$SYS"
     q_put "$ROOT/vendor/updater/default-permissions-xp8updater.xml" \
         /system/system_ext/etc/default-permissions/default-permissions-xp8updater.xml "$SYS"
+    q_put "$ROOT/vendor/keys/app/default-permissions-xp8buttons.xml" \
+        /system/product/etc/default-permissions/default-permissions-xp8buttons.xml "$SYS"
     # XP8Updater compares ro.xp8.release with the tag in the latest ota.json.
     dump /system/build.prop "$W/build.prop"
     printf '\n# XP8 GSI release\nro.xp8.release=%s\n' "$REL" >> "$W/build.prop"
@@ -490,12 +494,12 @@ PY
     printf '\nparallel_restorecon enabled\n' >> "$W/ueventd.rc"
     q "rm /system/etc/ueventd.rc"
     q_put "$W/ueventd.rc" /system/etc/ueventd.rc "$SYS"
-    q_put "$c/xp8-keys.dex" /system/etc/xp8/xp8-keys.dex "$SYS"
+    q_put "$c/xp8-daemon.dex" /system/etc/xp8/xp8-daemon.dex "$SYS"
     for f in gpio-keys PTT-Headset-Button; do
         q_put "$ROOT/vendor/keys/$f.kl" "/system/product/usr/keylayout/$f.kl" "$SYS"
     done
     q_put "$ROOT/vendor/xp8-gsi.rc" /system/etc/init/xp8-gsi.rc "$SYS"
-    for f in xp8-gsi.sh keys/xp8-keys.sh xp8-vendor-patch.sh sensors/xp8-sensors-screen.sh; do
+    for f in xp8-gsi.sh daemon/xp8-daemon.sh xp8-vendor-patch.sh sensors/xp8-sensors-screen.sh; do
         q_put "$ROOT/vendor/$f" "/system/bin/${f##*/}" "$SYS"
         q_meta "/system/bin/${f##*/}" 0100755 "$SYS"
     done
@@ -510,6 +514,19 @@ PY
     q_meta /odm/lib64/hw 040755 u:object_r:vendor_file:s0
     MADE[/odm/lib64/hw]=1
     q_put "$c/lights.qcom.so" /odm/lib64/hw/lights.qcom.so u:object_r:vendor_file:s0
+    q "rm /odm/etc"
+    q "mkdir /odm/etc"
+    q_meta /odm/etc 040755 u:object_r:vendor_configs_file:s0
+    for d in /odm/etc/vintf /odm/etc/vintf/manifest; do
+        q "mkdir $d"
+        q_meta "$d" 040755 u:object_r:vendor_configs_file:s0
+        MADE[$d]=1
+    done
+    # The Android 10 vendor linker namespace (which /odm/bin would use) has no libbinder_ndk.
+    q_put "$c/xp8-health" /system/bin/xp8-health "$SYS"
+    q_meta /system/bin/xp8-health 0100755 "$SYS"
+    q_put "$c/android.hardware.health-xp8.xml" /odm/etc/vintf/manifest/android.hardware.health-xp8.xml \
+        u:object_r:vendor_configs_file:s0
     q_commit
 }
 
