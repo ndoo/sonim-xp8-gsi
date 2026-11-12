@@ -275,10 +275,10 @@ static void refresh_locked(void) {
         else if (g_policy == POLICY_ADAPTIVE && g_resume_wall && wall < g_resume_wall && at80)
             reason = HOLD_NIGHT;
         else if (g_policy == POLICY_ADAPTIVE && at100) reason = HOLD_BASIC;
-        state = reason == HOLD_HEAT                         ? CS_TOO_HOT
-                : reason == HOLD_NIGHT                      ? CS_ADAPTIVE
-                : g_policy == POLICY_LONG_LIFE && !g_override ? CS_LONG_LIFE
-                                                              : CS_NORMAL;
+        state = reason == HOLD_HEAT    ? CS_TOO_HOT
+                : reason == HOLD_NIGHT ? CS_ADAPTIVE
+                : reason == HOLD_LIMIT ? CS_LONG_LIFE
+                                       : CS_NORMAL;
     }
     int hold = reason != HOLD_NONE;
     if (hold != g_held || reason != g_reason) {
